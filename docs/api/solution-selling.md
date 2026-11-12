@@ -37,8 +37,13 @@ be supplied on create or patch. Collection reads enrich only the requested page
 in the same governed query as its total count. A Contact without a Company still
 appears, with null Company fields. An unnamed Contact uses its first email as
 the display label, or `Unnamed contact` when no label is available. The Lead's
-`uid` remains its navigation and mutation identity. Lead `search` still matches
-notes; it does not search these display fields.
+`uid` remains its navigation and mutation identity. Lead `search` matches the
+Contact's full name, any of their email addresses, and their current primary
+Company's name. Matching is a case-insensitive literal substring, with no typo
+correction. Lead notes are excluded so hidden wording such as "generic" does
+not make an unrelated person match "Eric". Search and the resource filters apply
+before counting and pagination, so a match outside the initially loaded page
+is still returned. REST and MCP use the same search implementation.
 
 `POST /extensions/solution-selling/prompters/{uid}/render/` accepts a required
 `contact_uid` and explicit `company_uid`, optional lead/profile/deal/assessment

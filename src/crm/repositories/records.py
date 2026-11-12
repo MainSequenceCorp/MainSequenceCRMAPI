@@ -74,7 +74,7 @@ RECORDS: dict[str, RecordSpec] = {
         "solution_selling_lead",
         LeadCreate,
         SolutionSellingLead,
-        ("notes",),
+        (),  # Lead search resolves the referenced Contact and Company below.
         ("contact_uid", "profile_uid", "owner_uid", "status"),
         "updated_at",
     ),
@@ -126,6 +126,22 @@ def _lead_projection(source: str) -> str:
         "c.company_uid AS company_uid, company.name AS company_name "
         f'FROM {source} t LEFT JOIN "{contact}" c ON c.uid=t.contact_uid '
         f'LEFT JOIN "{company}" company ON company.uid=c.company_uid'
+    )
+
+
+def _lead_search() -> str:
+    """Search the Lead's person and current Company before counting/paging."""
+    contact = MODELS["contact"].__tablename__
+    company = MODELS["company"].__tablename__
+    return (
+        f'EXISTS (SELECT 1 FROM "{contact}" search_contact '
+        f'LEFT JOIN "{company}" search_company ON search_company.uid=search_contact.company_uid '
+        "WHERE search_contact.uid=t.contact_uid AND ("
+        "lower(concat_ws(' ', search_contact.first_name, search_contact.last_name)) "
+        "LIKE %(search)s ESCAPE '\\' "
+        "OR lower(coalesce(search_company.name, '')) LIKE %(search)s ESCAPE '\\' "
+        "OR EXISTS (SELECT 1 FROM jsonb_array_elements(search_contact.emails) search_email "
+        "WHERE lower(coalesce(search_email->>'email', '')) LIKE %(search)s ESCAPE '\\')))"
     )
 
 
@@ -219,14 +235,14 @@ class VersionedRecordStore(GovernedGateway):
                 + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_").casefold()
                 + "%"
             )
-            conditions.append(
+            conditions.append(_lead_search() if resource == "leads" else (
                 "("
                 + " OR ".join(
                     f"lower(coalesce(t.{field}::text, '')) LIKE %(search)s ESCAPE '\\'"
                     for field in spec.search
                 )
                 + ")"
-            )
+            ))
         where = " AND ".join(conditions)
         # Enrich only the requested page, without dropping Leads that have no Company.
         projection = f", projected AS ({_lead_projection('paged')})" if resource == "leads" else ""

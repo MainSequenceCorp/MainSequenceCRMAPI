@@ -38,6 +38,14 @@ Contact without a primary Company remains visible as **No company**. This
 Company label does not select the Company used for prompter rendering; that
 choice remains explicit for each draft.
 
+Lead search uses the Contact's full name, any recorded email address, and the
+current primary Company's name. It searches the complete eligible collection
+before pagination and counting, without copying these fields onto the Lead.
+Matching ignores case and treats wildcard characters literally. Lead notes
+are excluded so prose such as "generic profile" does not make an unrelated
+Contact appear when searching for "Eric". See the
+[API search contract](../api/solution-selling.md).
+
 The opportunity form can search for an existing Deal or quick-add one. Quick-add
 can also create the Company if needed. It creates a normal core CRM Deal first,
 then selects it and its Company in the assessment draft. The assessment is a

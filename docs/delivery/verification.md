@@ -2310,3 +2310,26 @@ duplicate, wrong-UID and inactive matches. Hosted OAuth verification and the
 hosted workload verification remain pending at this point. The real-provider
 local agent gate passed with CRM MCP reads, restart persistence and fresh API
 read-back; evidence is under `.local/agent-pre-push/953870f6-d8e2-4f87-8cee-6a344752c77c/report.json`.
+
+
+## Lead identity search correction — 2026-11-12
+
+The deployed search matched Lead notes rather than the displayed Contact.
+Searching `Eric` returned unrelated Leads whose notes contained words such as
+"generic" and omitted Eric Nguyen, despite his existing Contacted Lead.
+
+Lead search now matches the Contact's full name, all email addresses and current
+primary Company name before counting and pagination. Notes are excluded.
+Matching remains a case-insensitive literal substring, with escaped wildcard
+characters, existing filters and archive exclusion. REST and MCP share this
+governed query. No schema migration or record mutation is needed.
+
+The regression suite executes the submitted HTTP search and compiled SQL on
+owned PostgreSQL, covering names, secondary email, company, unnamed and
+companyless Contacts, unrelated hidden notes, literal wildcards, filters,
+archive exclusion and authoritative pagination. The selected search, display,
+Solution Selling, documentation and bootstrap suites passed 33 tests against
+the isolated release tree. Ruff on the changed Python files and the strict
+MkDocs build passed. The paired frontend's existing search transport is
+unchanged. The real-provider pre-push gate and hosted deployment are checked
+separately; local tests alone do not establish live behavior.

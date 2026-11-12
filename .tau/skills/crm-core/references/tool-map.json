@@ -39,7 +39,18 @@
       "crm_settings_get",
       "crm_settings_update",
       "crm_tasks_complete",
-      "crm_tasks_reopen"
+      "crm_tasks_reopen",
+      "crm_email_messages_list",
+      "crm_email_messages_get",
+      "crm_email_messages_create",
+      "crm_email_messages_follow_up",
+      "crm_gmail_email_search",
+      "crm_gmail_email_preview",
+      "crm_gmail_email_import",
+      "crm_email_thread_set_sync",
+      "crm_email_thread_sync",
+      "crm_gmail_conversation_preview",
+      "crm_gmail_conversation_import"
     ],
     "crm-deals": [
       "crm_deals_list",

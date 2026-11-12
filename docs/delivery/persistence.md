@@ -407,3 +407,17 @@ verification task, not an API startup dependency. See the [live gates](verificat
 
 The API uses the existing platform identity, policy and user directory. None
 of these tables is a replacement login or role database.
+
+
+Revision `0014` adds reviewed email conversations/messages and a nullable Task
+source-email reference with one-open-follow-up uniqueness. It enrolls no Google
+account or conversation. Apply it with the existing deployment migration Job;
+[Email history](../concepts/emails.md) describes the selection and retention
+boundary. Actual provider migration and restart reads are covered by the private
+PostgreSQL email suite, while existing revision tests cover local SQLite.
+
+Migration `0015` adds `email_lead_link`: a versioned, unique email-Interaction/Lead
+association. Historical batch capture, this explicit association and audit commit
+atomically. Contact merge moves a sole Lead and preserves its association; two
+Lead contexts block merge rather than silently collapsing their statuses or
+next actions. No source grant or message body is copied by a merge.

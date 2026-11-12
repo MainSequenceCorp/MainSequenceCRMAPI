@@ -36,7 +36,7 @@ def test_models_are_python_classes_not_runtime_json_definitions():
     assert not (API / "src/crm/data_dictionary.json").exists()
     assert not (API / "src/crm/crm-domain.schema.json").exists()
     assert not (API / "src/crm/import-mapping.schema.json").exists()
-    assert len(MODELS) == 33
+    assert len(MODELS) == 36
     for logical_name, model in MODELS.items():
         expected_module = (
             "src.crm.metatables.solution_selling"
@@ -45,6 +45,8 @@ def test_models_are_python_classes_not_runtime_json_definitions():
             if logical_name.startswith("google_oauth")
             else "src.crm.metatables.campaigns"
             if logical_name.startswith("campaign")
+            else "src.crm.metatables.email"
+            if logical_name.startswith("email_")
             else f"src.crm.metatables.{logical_name}"
         )
         assert model.__module__ == expected_module

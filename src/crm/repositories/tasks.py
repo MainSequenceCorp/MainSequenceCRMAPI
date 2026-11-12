@@ -46,13 +46,19 @@ class TaskRepository(GovernedGateway):
             if completed
             else "state='blocked', blocked_reason='task_reopened' WHERE g.state='completed'"
         )
+        lead = MODELS["solution_selling_lead"].__tablename__
+        lead_cte = (
+            f'leads_cleared AS (UPDATE "{lead}" l SET next_task_uid=NULL, version=l.version+1, '
+            "updated_at=NOW(), updated_by_uid=%(actor_uid)s::uuid FROM changed "
+            "WHERE l.next_task_uid=changed.uid AND changed.completed_at IS NOT NULL RETURNING l.uid), "
+        )
         sql = (
             f'WITH changed AS (UPDATE "{task}" target SET completed_at={completed_at}, '
             f"completed_by_uid={completed_by}, updated_at=NOW(), "
             "updated_by_uid=CAST(%(actor_uid)s AS uuid), version=target.version+1 "
             "WHERE target.uid=CAST(%(entity_uid)s AS uuid) "
             "AND target.version=CAST(%(expected_version)s AS bigint) RETURNING target.*), "
-            f'campaign_blocked AS (UPDATE "{progress}" g SET updated_at=NOW(), {campaign_guard} '
+            + lead_cte + f'campaign_blocked AS (UPDATE "{progress}" g SET updated_at=NOW(), {campaign_guard} '
             "AND g.task_uid=CAST(%(entity_uid)s AS uuid) RETURNING g.uid) "
             f'INSERT INTO "{activity}" (uid, entity_type, entity_uid, '
             "kind, occurred_at, recorded_at, actor_uid, origin, command_uid, summary, changes, "

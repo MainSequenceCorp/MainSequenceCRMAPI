@@ -126,7 +126,8 @@ def test_one_governed_statement_locks_selection_and_records_every_deletion():
 
 
 def test_published_sdk_contracts_and_indexed_fixtures():
-    static = Path(__file__).resolve().parents[2] / "main-sequence-crm-5f1b0619-9997-449c-b986-36990ae49e14"
+    import os
+    static = Path(os.environ.get("CRM_FRONTEND_ROOT", str(Path(__file__).resolve().parents[2] / "main-sequence-crm-5f1b0619-9997-449c-b986-36990ae49e14")))
     root = static / "node_modules/@dev-mainsequence/command-center-sdk/contracts"
     manifest = json.loads((root / "manifest.json").read_text())
     schemas = [json.loads((root / item["file"]).read_text()) for item in manifest["schemas"]]

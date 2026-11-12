@@ -2312,6 +2312,103 @@ local agent gate passed with CRM MCP reads, restart persistence and fresh API
 read-back; evidence is under `.local/agent-pre-push/953870f6-d8e2-4f87-8cee-6a344752c77c/report.json`.
 
 
+## 2026-11-10 selected email capture and thread refresh (local source)
+
+Uncommitted source based on `7feeee2` adds core stored-email history, explicit
+Gmail preview/import, owner-selected future-thread refresh, atomic follow-up
+linkage and migration `0014`. Search, connection and one-message import never
+implicitly enroll a thread or mailbox. Thread metadata is inspected before
+eligible new bodies are fetched, with scope/grant checks before reads and at
+commit. This is an authenticated reader/explicit refresh implementation; no
+unattended worker or broader mailbox synchronization is declared.
+
+The selected API/MCP/catalog/migration/documentation regression command passed
+79 tests. Eleven email cases execute actual compiled commands against private
+PostgreSQL 17, including final-audit rollback, duplicate prevention, account and
+selection fences, permission revocation, Task reuse, provider migration and
+fresh-interpreter persistence. Platform transport/directory/provider are fixtures;
+this is not evidence of live Google authorization or hosted database grants.
+The full provider history also passes on temporary SQLite. Strict MkDocs and
+mounted route-index checks passed. The paired frontend's fixture workflow,
+responsive SDK checks and same-artifact user-guide checks passed separately.
+
+Deploy through the existing migration Job, then verify fresh live catalog
+bindings and an owned disposable record against the actual Gmail/hosted caller
+path. No hosted migration, release, customer email import or push was performed.
+The real-provider local-agent pre-push gate remains required before publishing.
+See [email concepts](../concepts/emails.md), [API](../api/emails.md) and
+[ADR 0002](../google_workspace_module/adrs/0002-selected-email-history.md).
+
+## Lead identity search correction — 2026-11-11
+
+Read-only checks against the deployed CRM reproduced the reported behavior:
+`crm_leads_list(search="Eric")` returned eight unrelated Leads and omitted
+Eric Nguyen. Filtering by his Contact UID returned his existing Contacted Lead.
+The authored collection searched Lead notes, while the Contact and Company
+labels were joined only after filtering and paging. "Eric" therefore matched
+the substring in hidden wording such as "generic".
+
+The local correction searches the referenced Contact's full name and every
+email address plus the current primary Company name, before count/pagination.
+Notes are excluded. It retains case-insensitive literal substring matching,
+archive exclusion, explicit filters, authoritative totals and one governed SQL
+operation. No schema migration or record mutation is needed for this fix.
+
+`CRM_TEST_POSTGRES_DOCKER=1 .venv/bin/python -m pytest tests/test_lead_search.py
+tests/test_lead_display.py tests/test_solution_selling.py -q --tb=short -x`
+passed 26 cases, including 15 new actual-PostgreSQL/HTTP cases for names, all
+emails, Companies, missing names/Companies, hidden-note false matches, literal
+wildcards, injection-like input, archives, filters and cross-page totals.
+The separate Lead/Solution Selling/shared-operation/MCP/documentation regression
+selection passed 38 cases. Strict MkDocs passed. Containers used random
+loopback ports, contained only synthetic records, and were removed afterwards.
+
+The paired frontend's Leads search box passed eight isolated browser requests;
+Node tests, TypeScript, the application/user-guide build, guide validation and
+theme audit also passed. These are local code and fixture checks. The live
+reads establish the deployed bug, not deployment of the correction. No push,
+release or customer record update was performed.
+
+## Shared email conversation ADR amendment — 2026-11-12
+
+[ADR 0002](../google_workspace_module/adrs/0002-selected-email-history.md) now
+records the user-accepted shared-conversation model: private owner-held Gmail
+authority, explicit historical message selection/publication, a clearly stated
+`crm.read` audience, saved Lead associations, separate source-thread enrollment,
+and independent mailbox attribution with no automatic cross-mailbox merging.
+The concepts and current local API reference distinguish that accepted target
+from the incomplete, unpublished implementation. Lead UI, multi-message import,
+association/query work and multi-user integration checks remain outstanding;
+private/team-only email audiences and an unattended worker are separate extensions.
+
+This is a documentation change. It implements no route, schema, permission,
+worker or email import and changes no live CRM record or deployment. Approval
+of the ADR does not itself select or publish customer correspondence. The ADR's
+acceptance criteria are requirements, not evidence of executed integration tests.
+For this amendment, `.venv/bin/mkdocs build --strict` passed,
+`.venv/bin/python -m pytest tests/test_documentation.py -q --tb=short` passed
+one route-reference test, and `git diff --check` passed in both repositories.
+Prior local email fixtures do not verify the amended workflow.
+
+## 2026-11-12 shared conversation implementation
+
+The local extension implements context-bound historical review/import (at most
+25 messages per page), explicit `EmailLeadLink`, shared-reader audience and
+owner-only future sync. REST and MCP share the same operations; the new public
+tools are `crm_gmail_conversation_preview` and `crm_gmail_conversation_import`.
+Owned PostgreSQL tests cover selected subsets, no-preview persistence, changes
+after review, page boundaries, missing/forged audiences, stale Leads, two
+mailbox owners, shared readers without mailbox access, denied counts/bodies,
+source deduplication and audit rollback. Contact-merge preservation is included.
+
+The isolated browser exercises Lead → Email conversations → Add, explicit
+historical selection and audience, sync controls, conflict recovery and Task
+follow-up. API strict documentation, frontend type/build/theme and same-artifact
+help checks passed locally. Release checkout checks, real-provider pre-push and
+actual rollout are still pending at this entry; these fixture results do not
+establish live Gmail import or deploy email records for Eric.
+
+
 ## Lead identity search correction — 2026-11-12
 
 The deployed search matched Lead notes rather than the displayed Contact.
@@ -2333,3 +2430,9 @@ the isolated release tree. Ruff on the changed Python files and the strict
 MkDocs build passed. The paired frontend's existing search transport is
 unchanged. The real-provider pre-push gate and hosted deployment are checked
 separately; local tests alone do not establish live behavior.
+
+The correction was subsequently verified live on commit `b8b1f30`: the actual
+hosted Leads screen and MCP search for Eric returned Eric Nguyen and Eric Karobia.
+The API active revision was `7aaebbc1-a7be-415f-8020-a514f7c1b908`; the owner
+requested idle scale-down delay is 300 seconds. This email release preserves
+the search correction and its authoritative count/filter behavior.

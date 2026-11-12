@@ -10,6 +10,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKeyConstraint,
+    ForeignKey,
     Index,
     String,
     Text,
@@ -38,6 +39,7 @@ class Task(PlatformManagedMetaTable, Base):
         ),
         CheckConstraint("length(trim(text)) > 0", name="ck_mainsequence_crm__task_1"),
         Index("ix_mainsequence_crm__task_1", "contact_uid"),
+        Index("uq_crm_task_open_email", "source_email_message_uid", unique=True, postgresql_where=text("source_email_message_uid IS NOT NULL AND completed_at IS NULL AND archived_at IS NULL"), sqlite_where=text("source_email_message_uid IS NOT NULL AND completed_at IS NULL AND archived_at IS NULL")),
         Index(
             "ix_mainsequence_crm__task_open_due",
             "owner_uid",
@@ -113,6 +115,11 @@ class Task(PlatformManagedMetaTable, Base):
         primary_key=False,
         nullable=False,
         info={"label": "Contact Uid", "description": "contact uid"},
+    )
+
+    source_email_message_uid: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(), ForeignKey("mainsequence_crm__email_message.uid"),
+        info={"label": "Source email", "description": "Optional stored email that prompted this follow-up."},
     )
 
     owner_uid: Mapped[uuid.UUID | None] = mapped_column(

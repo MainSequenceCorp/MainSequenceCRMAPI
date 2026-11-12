@@ -143,7 +143,7 @@ def test_merge_unions_distinct_platforms_and_resolves_same_platform(monkeypatch)
     monkeypatch.setattr(
         store.merge_repo,
         "_operation",
-        lambda **_call: {
+        lambda **_call: {"rows": []} if 'SELECT uid, version FROM mainsequence_crm__solution_selling_lead' in _call['sql'] else {
             "rows": [
                 {
                     "notes": 0,

@@ -143,6 +143,14 @@ class ContactMerge(GovernedGateway):
             # Enrollment identity is immutable and A/B assignments are per Contact;
             # no merge policy combines them yet (ADR 0001 implementation plan).
             raise ResourceConflict("Contacts enrolled in a Campaign cannot be merged")
+        leads = self._operation(
+            operation="select",
+            sql='SELECT uid, version FROM mainsequence_crm__solution_selling_lead WHERE contact_uid IN (%(loser_uid)s::uuid, %(survivor_uid)s::uuid) ORDER BY uid',
+            parameters={"loser_uid": str(loser_uid), "survivor_uid": str(survivor_uid)},
+            parameter_types={}, max_rows=2,
+        ).get("rows", [])
+        if len(leads) > 1:
+            raise ResourceConflict("Both Contacts have Leads; consolidate their Lead context before merging")
         counts_result = self._operation(
             operation="select",
             sql=(
@@ -172,6 +180,7 @@ class ContactMerge(GovernedGateway):
             for key in ("notes", "tasks", "deals", "tags", "source_identities", "affiliations")
         }
         fingerprint = {
+            "leads": [{"uid": str(row["uid"]), "version": row["version"]} for row in leads],
             "survivor_uid": str(survivor_uid),
             "loser_uid": str(loser_uid),
             "survivor_version": survivor["version"],
@@ -235,6 +244,7 @@ class ContactMerge(GovernedGateway):
         source_identity = MODELS["source_identity"].__tablename__
         affiliation = MODELS["contact_company_affiliation"].__tablename__
         interaction = MODELS["interaction"].__tablename__
+        email_thread = MODELS["email_thread"].__tablename__
         redirect = MODELS["entity_redirect"].__tablename__
         activity = MODELS["activity_event"].__tablename__
         proposed = preview["proposed_contact"]
@@ -312,15 +322,15 @@ class ContactMerge(GovernedGateway):
             "updated_by_uid=CAST(%(actor_uid)s AS uuid), version=t.version+1 FROM survivor s "
             "WHERE t.contact_uid=CAST(%(loser_uid)s AS uuid) RETURNING t.uid), "
             f'interactions_changed AS (UPDATE "{interaction}" i SET participants=('
-            "SELECT COALESCE(jsonb_agg(CASE WHEN p->>'contact_uid'=%(loser_uid)s "
+            "SELECT COALESCE(jsonb_agg(CASE WHEN p->>'contact_uid'=%(loser_uid)s::text "
             "THEN jsonb_set(p, '{contact_uid}', to_jsonb(s.uid::text)) ELSE p END ORDER BY ord) "
-            "FILTER (WHERE NOT (p->>'contact_uid'=%(loser_uid)s AND EXISTS ("
+            "FILTER (WHERE NOT (p->>'contact_uid'=%(loser_uid)s::text AND EXISTS ("
             "SELECT 1 FROM jsonb_array_elements(i.participants) existing "
             "WHERE existing->>'contact_uid'=s.uid::text))), '[]'::jsonb) "
             "FROM jsonb_array_elements(i.participants) WITH ORDINALITY AS people(p, ord)), "
             "updated_at=NOW(), updated_by_uid=%(actor_uid)s::uuid, version=i.version+1 "
             "FROM survivor s WHERE i.participants @> jsonb_build_array(jsonb_build_object("
-            "'contact_uid', %(loser_uid)s)) RETURNING i.uid), "
+            "'contact_uid', %(loser_uid)s::text)) RETURNING i.uid), "
             f'sources_changed AS (UPDATE "{source_identity}" si SET target_uid=s.uid, '
             "updated_at=NOW() FROM survivor s WHERE si.entity_type='contact' "
             "AND si.target_uid=CAST(%(loser_uid)s AS uuid) RETURNING si.uid), "
@@ -337,9 +347,21 @@ class ContactMerge(GovernedGateway):
             "updated_by_uid=%(actor_uid)s::uuid FROM survivor s "
             "CROSS JOIN (SELECT count(*) FROM affiliations_demoted) demoted "
             "WHERE a.contact_uid=CAST(%(loser_uid)s AS uuid) RETURNING a.uid), "
+            f'email_threads_changed AS (UPDATE "{email_thread}" e SET contact_uid=s.uid, updated_at=NOW(), '
+            "updated_by_uid=%(actor_uid)s::uuid, version=e.version+1 FROM survivor s "
+            "WHERE e.contact_uid=%(loser_uid)s::uuid RETURNING e.uid), "
+            'leads_changed AS (UPDATE mainsequence_crm__solution_selling_lead l SET contact_uid=s.uid, updated_at=NOW(), '
+            'updated_by_uid=%(actor_uid)s::uuid, version=l.version+1 FROM survivor s '
+            'WHERE l.contact_uid=%(loser_uid)s::uuid RETURNING l.uid), '
+            'diagnoses_changed AS (UPDATE mainsequence_crm__solution_selling_diagnosis d SET contact_uid=s.uid, updated_at=NOW(), '
+            'updated_by_uid=%(actor_uid)s::uuid, version=d.version+1 FROM survivor s '
+            'WHERE d.contact_uid=%(loser_uid)s::uuid RETURNING d.uid), '
             f'retired AS (DELETE FROM "{contact}" l USING survivor s, '
             "(SELECT count(*) FROM affiliations_moved) moved, "
-            "(SELECT count(*) FROM interactions_changed) people_moved "
+            "(SELECT count(*) FROM interactions_changed) people_moved, "
+            "(SELECT count(*) FROM email_threads_changed) email_moved, "
+            "(SELECT count(*) FROM leads_changed) leads_moved, "
+            "(SELECT count(*) FROM diagnoses_changed) diagnoses_moved "
             "WHERE l.uid=CAST(%(loser_uid)s AS uuid) "
             "AND l.version=CAST(%(loser_expected_version)s AS bigint) RETURNING l.uid), "
             f'redirected AS (INSERT INTO "{redirect}" '

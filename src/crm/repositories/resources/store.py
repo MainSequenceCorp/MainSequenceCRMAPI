@@ -6,6 +6,7 @@ import uuid
 from typing import Any
 
 from ...models.queries import QueryScope
+from ...emails.store import EmailStore
 from ...platform.catalog import CatalogRegistry, configured_registry
 from ..contacts.affiliations import ContactAffiliations
 from ..contacts.merge import ContactMerge
@@ -22,6 +23,7 @@ class GovernedResourceStore:
 
     def __init__(self, registry: CatalogRegistry | None = None):
         binding_registry = registry or configured_registry()
+        self.emails = EmailStore(binding_registry)
         self.reads = ResourceReads(binding_registry)
         self.mutations = ResourceMutations(binding_registry, self.reads)
         self.affiliations_repo = ContactAffiliations(binding_registry, self.reads)

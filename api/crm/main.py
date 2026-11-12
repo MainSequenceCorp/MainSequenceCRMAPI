@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from api.crm.affiliation_routes import router as affiliation_router
+from api.crm.email_routes import router as email_router
 from api.crm.campaign_routes import router as campaign_router
 from api.crm.google_routes import mount_public_routes as mount_google_public_routes
 from api.crm.google_routes import router as google_router
@@ -68,6 +69,7 @@ def create_app() -> FastAPI:
     application.add_api_route("/api/crm/v1/bootstrap/", bootstrap, methods=["GET"])
     application.include_router(crm_router)
     application.include_router(resource_router)
+    application.include_router(email_router)
     application.include_router(affiliation_router)
     application.include_router(transfer_router)
     if google_workspace_enabled():

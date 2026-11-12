@@ -40,3 +40,5 @@ change the title with the same version fence: omit it to preserve it or send
 search matches both title and body.
 
 See the [engagement API](../api/engagement.md) for the task and note endpoints.
+
+An email follow-up can reference its stored source message. Completion or archive clears a Lead next-task pointer; reopening does not silently select it again. See [Emails](emails.md).

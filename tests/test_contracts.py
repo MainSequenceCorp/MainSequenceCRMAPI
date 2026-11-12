@@ -12,8 +12,8 @@ from src.crm.models.errors import Error
 ACTOR = uuid.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 
 
-def test_dictionary_has_thirty_three_managed_tables_without_application_tenant():
-    assert len(MODELS) == len(Base.metadata.tables) == 33
+def test_dictionary_has_thirty_six_managed_tables_without_application_tenant():
+    assert len(MODELS) == len(Base.metadata.tables) == 36
     for name, model in MODELS.items():
         assert model.__tablename__ == f"mainsequence_crm__{name}"
         assert model.__metatable_namespace__ == "mainsequence-crm"

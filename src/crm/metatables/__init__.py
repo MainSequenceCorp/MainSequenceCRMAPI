@@ -17,6 +17,7 @@ from .contact_tag import ContactTag
 from .deal import Deal
 from .deal_contact import DealContact
 from .entity_redirect import EntityRedirect
+from .email import EmailLeadLink, EmailMessage, EmailThread
 from .google_oauth import GoogleOAuthAttempt, GoogleOAuthConnection
 from .interaction import Interaction
 from .note import Note
@@ -52,6 +53,9 @@ MODELS = {
     "note": Note,
     "prompt": Prompt,
     "task": Task,
+    "email_thread": EmailThread,
+    "email_message": EmailMessage,
+    "email_lead_link": EmailLeadLink,
     "activity_event": ActivityEvent,
     "entity_redirect": EntityRedirect,
     "source_connection": SourceConnection,

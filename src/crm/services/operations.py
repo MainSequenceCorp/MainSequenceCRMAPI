@@ -29,6 +29,7 @@ from ..models.record_filters import RecordFilters
 from ..platform.diagnostics import observe_stage
 from ..platform.runtime import CAPABILITIES, BootstrapPort, DirectoryPort, PolicyPort
 from ..repositories.campaigns import CampaignStore
+from ..repositories.errors import ResourceConflict
 from ..repositories.records import RECORDS, VersionedRecordStore
 from ..repositories.resources.catalog import ORDER_COLUMNS, RESOURCE_SPECS
 from ..repositories.resources.store import GovernedResourceStore
@@ -146,6 +147,11 @@ class CRMOperations:
         self._campaign_store = campaign_store
 
     @property
+    def emails(self):
+        from ..emails.service import EmailOperations
+        return EmailOperations(self.context, resources=self.resources)
+
+    @property
     def campaigns(self):
         """Campaigns module operations over the same actor, policy and stores."""
         from ..campaigns.service import CampaignOperations
@@ -213,6 +219,8 @@ class CRMOperations:
             if resource == "prompts":
                 # Validate the complete candidate, but only write/audit requested fields.
                 data = {key: data[key] for key in patch["changes"]}
+        if resource == "tasks" and existing.get("source_email_message_uid") and str(data.get("contact_uid")) != str(existing["contact_uid"]):
+            raise ResourceConflict("An email follow-up must stay with its conversation's Contact")
         self._owner(data)
         return self.resources.update(resource, self.context.actor_uid, uid, expected_version, data)
 

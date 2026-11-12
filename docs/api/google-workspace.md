@@ -49,3 +49,5 @@ record UID for an **Open in CRM** link.
 
 These routes exist in source code. A deployed connection has **not** been
 verified; see [release evidence](../delivery/verification.md).
+
+Explicit message capture and selected-thread refresh are documented in [Emails](emails.md). The existing correspondent finder still imports Contacts only.

@@ -18,6 +18,7 @@ nav:
       - Prompts: concepts/prompts.md
       - Campaigns: concepts/campaigns.md
       - Interactions: concepts/interactions.md
+      - Emails: concepts/emails.md
       - Tags and activity: concepts/tags-activity.md
       - Transfers: concepts/transfers.md
       - Assistant: concepts/assistant.md
@@ -30,6 +31,7 @@ nav:
       - Tasks, notes, tags, and activity: api/engagement.md
       - Prompts: api/prompts.md
       - Interactions: api/interactions.md
+      - Emails: api/emails.md
       - Solution Selling: api/solution-selling.md
       - Campaigns: api/campaigns.md
       - Google Workspace: api/google-workspace.md
@@ -51,6 +53,7 @@ nav:
       - Set up Google access: google_workspace_module/setup.md
       - ADRs:
           - '0001: User-authorized intake': google_workspace_module/adrs/0001-google-workspace-intake.md
+          - '0002: Selected email history': google_workspace_module/adrs/0002-selected-email-history.md
   - Solution Selling module:
       - Overview: solution_selling_module/index.md
       - ADRs:

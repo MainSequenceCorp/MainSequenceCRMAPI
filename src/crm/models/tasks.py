@@ -29,6 +29,7 @@ class Task(BaseModel):
     archived_at: AwareDatetime | None
     contact_uid: UUID
     owner_uid: UUID | None
+    source_email_message_uid: UUID | None = None
     type_key: constr(max_length=100)
     text: constr(min_length=1, max_length=100000)
     due_at: AwareDatetime | None

@@ -452,6 +452,10 @@ class ResourceMutations(GovernedGateway):
                 "updated_at=NOW(), updated_by_uid=%(actor_uid)s::uuid, version=p.version+1 "
                 "FROM changed WHERE p.uid=changed.pipeline_uid RETURNING p.uid)"
             )
+        if archived and resource == "tasks":
+            lead_table = MODELS["solution_selling_lead"].__tablename__
+            ctes.append(f'leads_cleared AS (UPDATE "{lead_table}" l SET next_task_uid=NULL, version=l.version+1, '
+                        "updated_at=NOW(), updated_by_uid=%(actor_uid)s::uuid FROM changed WHERE l.next_task_uid=changed.uid RETURNING l.uid)")
         source = "changed"
         if archived and resource in {"tasks", "prompts"}:
             # Archiving an assigned prompt or a campaign Task blocks its open work for

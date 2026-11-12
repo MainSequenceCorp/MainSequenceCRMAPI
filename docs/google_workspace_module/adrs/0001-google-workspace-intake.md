@@ -8,6 +8,10 @@
   boundaries
 - **Setup:** [Google Cloud and OAuth client guide](../setup.md)
 
+Email-body retention and selected-thread sync are superseded by
+[ADR 0002](0002-selected-email-history.md). Its explicit selection rules prohibit
+automatic whole-mailbox import. Other intake and credential decisions still apply.
+
 ## Context
 
 A CRM user wants to add contacts from their Google account, including people

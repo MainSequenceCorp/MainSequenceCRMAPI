@@ -247,6 +247,8 @@ class LeadCreate(LeadFields):
 
 
 class SolutionSellingLead(LeadFields, Record):
+    next_task_text: str | None = None
+    next_task_due_at: AwareDatetime | None = None
     contact_display_name: str
     company_uid: UUID | None
     company_name: str | None

@@ -123,9 +123,10 @@ def _lead_projection(source: str) -> str:
     return (
         "SELECT t.*, COALESCE(NULLIF(trim(concat_ws(' ', c.first_name, c.last_name)), ''), "
         "c.emails->0->>'email', 'Unnamed contact') AS contact_display_name, "
-        "c.company_uid AS company_uid, company.name AS company_name "
+        "c.company_uid AS company_uid, company.name AS company_name, next_task.text AS next_task_text, next_task.due_at AS next_task_due_at "
         f'FROM {source} t LEFT JOIN "{contact}" c ON c.uid=t.contact_uid '
-        f'LEFT JOIN "{company}" company ON company.uid=c.company_uid'
+        f'LEFT JOIN "{company}" company ON company.uid=c.company_uid '
+        f'LEFT JOIN "{MODELS["task"].__tablename__}" next_task ON next_task.uid=t.next_task_uid AND next_task.completed_at IS NULL AND next_task.archived_at IS NULL'
     )
 
 
@@ -370,6 +371,12 @@ class VersionedRecordStore(GovernedGateway):
                 "AND s.archived_at IS NULL AND i.archived_at IS NULL)"
             )
         if resource == "interactions" and not creating:
+            threads = MODELS["email_thread"].__tablename__
+            clauses.append(
+                f'NOT EXISTS (SELECT 1 FROM "{threads}" e WHERE e.interaction_uid=%(uid)s::uuid '
+                "AND (%(kind)s <> 'email' OR NOT (%(participants)s::jsonb @> "
+                "jsonb_build_array(jsonb_build_object('contact_uid', e.contact_uid::text)))))"
+            )
             diagnosis = MODELS["solution_selling_diagnosis"].__tablename__
             assessment = MODELS["solution_selling"].__tablename__
             clauses.append(

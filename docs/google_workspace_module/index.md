@@ -50,6 +50,11 @@ imported only when its review is saved.
 
 - [ADR 0001: User-authorized Google Workspace intake](adrs/0001-google-workspace-intake.md)
   specifies the OAuth flow, token custody, matching, and import boundaries.
+- [ADR 0002: Shared CRM email conversations](adrs/0002-selected-email-history.md),
+  amended on 2026-11-12, defines private mailbox authority, explicit publication
+  into shared CRM history, historical message selection, Lead associations and
+  owner-selected future replies. The complete amended workflow is not yet
+  implemented or deployed; see its status and verification requirements.
 - [Set up Google access](setup.md) gives the Google Cloud Console steps, the
   exact public ingress and callback setup, scopes, Workspace Admin checks,
   and CRM configuration handoff.

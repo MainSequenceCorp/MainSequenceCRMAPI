@@ -169,3 +169,16 @@ FastAPI's generated OpenAPI paths.
 
 Export creation and download routes are not mounted and therefore do not
 appear here.
+| `GET` | `/api/crm/v1/email-messages/discovery/` | [Emails](emails.md) |
+| `GET` | `/api/crm/v1/email-messages/` | [Emails](emails.md) |
+| `POST` | `/api/crm/v1/email-messages/` | [Emails](emails.md) |
+| `GET` | `/api/crm/v1/email-messages/{uid}/` | [Emails](emails.md) |
+| `POST` | `/api/crm/v1/email-messages/{uid}/follow-up/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-search/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-conversation-previews/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-conversation-imports/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-previews/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-imports/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-threads/{uid}/selection/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-threads/{uid}/sync/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-sync/` | [Emails](emails.md) |

@@ -1,0 +1,12 @@
+site_name: Catalog API
+site_description: Independently owned Catalog contracts and local delivery
+site_url: http://localhost/
+docs_dir: ../../docs/catalog
+site_dir: ../../site/catalog
+theme:
+  name: mkdocs
+nav:
+  - Overview: index.md
+  - Concepts: concepts.md
+  - API: api.md
+  - Local delivery: delivery.md

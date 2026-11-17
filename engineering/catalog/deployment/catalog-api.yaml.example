@@ -1,0 +1,51 @@
+# Inert candidate: outside .mainsequence/workflows. Not platform-validated or approved.
+# Validate target branch and access, then obtain user approval before activation.
+api_version: "3.0.0"
+name: catalog-api
+resources:
+  - key: catalog
+    kind: fastapi
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      source_path: api/erp/catalog/main.py
+      mcp_enabled: false
+      cpu_request: "0.5"
+      memory_request: 1Gi
+      spot: false
+      automatic_deployment: true
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-catalog$'
+      revision_retention_count: 3
+  - key: migrate-catalog
+    kind: job
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      name: Catalog migrations
+      description: Apply only Catalog migrations before Catalog API activation.
+      execution_path: jobs/erp/catalog/migrate.py
+      cpu_request: "0.5"
+      memory_request: "1"
+      max_runtime_seconds: 1800
+      spot: false
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-catalog$'
+execution:
+  steps:
+    image:
+      prepare_image: catalog
+    migrate:
+      run_job: migrate-catalog
+      image_from: image
+      needs: [image]
+    deploy_api:
+      deploy: catalog
+      image_from: image
+      needs: [migrate]

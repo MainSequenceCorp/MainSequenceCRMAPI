@@ -1,0 +1,12 @@
+{
+  "actions": [
+    {
+      "id": "archive",
+      "label": "Archive services",
+      "endpoint": "/services/actions/archive/",
+      "method": "POST",
+      "selection_modes": ["explicit", "explicit"],
+      "options": []
+    }
+  ]
+}

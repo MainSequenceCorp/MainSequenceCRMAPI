@@ -13,6 +13,7 @@ class Module:
 
 MODULES = {
     "base": Module("base", "/api/base/v1", "src.erp.base.migrations:migration"),
+    "catalog": Module("catalog", "/api/catalog/v1", "src.erp.catalog.migrations:migration"),
     "crm": Module("crm", "/api/crm/v1", "src.erp.crm.migrations:migration", ("base",)),
 }
 

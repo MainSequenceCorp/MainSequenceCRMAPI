@@ -2502,3 +2502,20 @@ PostgreSQL; live business reads stayed read-only. No actual Gmail message was
 read or imported, and a second real user's session was not exercised. The local
 API and browser suites cover selection, sharing, source-owner controls and
 transaction boundaries; they are not live Google-import evidence.
+
+
+## CRM domain relocation and current MetaTables client (2026-11-17)
+
+CRM implementation, tests, documentation and project-owned agent resources moved
+to domain directories; the maintainer layout in `engineering/crm/architecture/`
+records ownership and compatibility entrypoints. Public routes, tools, resource
+keys, tables and migration history are retained. The old migration Job path stays
+indexed and delegates to the moved implementation by its file location.
+
+Production's current catalog exposes `namespaces`. The previous locked MetaTables
+0.1.51 expected the removed singular response field and rejected the Alembic
+registry, blocking migration and rollout. Following explicit user approval, CRM
+now uses MetaTables 0.1.67 and its current membership contract directly, with no
+legacy fallback. A read-only hosted check validated all 36 table bindings and
+the initialized singleton settings row at revision `0015`. Complete local suite,
+real-provider agent and exact-commit deployment evidence is reported separately.

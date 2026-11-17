@@ -23,6 +23,7 @@ These methods and paths are mounted by the current application. See the [OpenAPI
 | POST | `/meta-tables/` | Reserve Tables | 201 |
 | GET | `/meta-tables/column-search/` | Column Search | 200 |
 | POST | `/meta-tables/execute-operation/` | Execute Operation | 200 |
+| POST | `/meta-tables/execute-transaction/` | Execute Transaction | 200 |
 | POST | `/meta-tables/filter/` | Filter Meta Tables | 200 |
 | POST | `/meta-tables/finalize-managed/` | Finalize Managed | 200 |
 | POST | `/meta-tables/import-from-data-source/` | Import Source | 200 |
@@ -37,6 +38,7 @@ These methods and paths are mounted by the current application. See the [OpenAPI
 | GET | `/meta-tables/{table_uid}/impact/` | Get Impact | 200 |
 | POST | `/meta-tables/{table_uid}/introspect/` | Introspect Meta Table | 200 |
 | POST | `/meta-tables/{table_uid}/migration-connection/` | Migration Connection | 200 |
+| POST | `/meta-tables/{table_uid}/namespaces/changes/` | Change Meta Table Namespaces | 200 |
 | POST | `/meta-tables/{table_uid}/read/` | Read Rows | 200 |
 | GET | `/meta-tables/{table_uid}/schema-graph` | Get Schema Graph | 200 |
 | GET | `/meta-tables/{table_uid}/search-document/` | Get Table Search Document | 200 |
@@ -83,6 +85,7 @@ These methods and paths are mounted by the current application. See the [OpenAPI
 | POST | `/time-index-meta-tables/` | Reserve Tables | 201 |
 | GET | `/time-index-meta-tables/column-search/` | Time Index Column Search | 200 |
 | POST | `/time-index-meta-tables/execute-operation/` | Time Index Execute Operation | 200 |
+| POST | `/time-index-meta-tables/execute-transaction/` | Time Index Execute Transaction | 200 |
 | POST | `/time-index-meta-tables/filter/` | Time Index Filter Meta Tables | 200 |
 | POST | `/time-index-meta-tables/finalize-managed/` | Time Index Finalize Managed | 200 |
 | POST | `/time-index-meta-tables/get-data-between-dates-from-table-update/` | Get Data Between Dates From Table Update | 200 |
@@ -102,6 +105,7 @@ These methods and paths are mounted by the current application. See the [OpenAPI
 | GET | `/time-index-meta-tables/{table_uid}/impact/` | Time Index Get Impact | 200 |
 | POST | `/time-index-meta-tables/{table_uid}/introspect/` | Time Index Introspect Meta Table | 200 |
 | POST | `/time-index-meta-tables/{table_uid}/migration-connection/` | Time Index Migration Connection | 200 |
+| POST | `/time-index-meta-tables/{table_uid}/namespaces/changes/` | Time Index Change Meta Table Namespaces | 200 |
 | GET | `/time-index-meta-tables/{table_uid}/schema-graph` | Time Index Get Schema Graph | 200 |
 | GET | `/time-index-meta-tables/{table_uid}/search-document/` | Time Index Get Table Search Document | 200 |
 | GET | `/time-index-meta-tables/{table_uid}/updates` | List Table Updates | 200 |

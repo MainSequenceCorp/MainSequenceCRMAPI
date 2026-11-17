@@ -9,6 +9,23 @@ revealing hidden related tables. Supported metadata PATCH fields update catalog
 state; label replacement is separate from currently unavailable add/remove-label
 actions.
 
+A table document carries `namespaces`: every namespace the table is in, each as
+`{uid, name, source}` ([ADR 0028](../adr/api/0028-tables-in-several-namespaces.md)).
+`source` is `declared` when the application's code put the table there, or `manual`
+when a person added it. The `namespace`, `namespace__in`, `namespace__contains`,
+`namespace_uid` and `namespace_uid__in` filters match a table that is in such a
+namespace; `namespace__isnull=true` matches a table in none. Other documents that name
+a table's namespaces return the list of names: the access map, the impact pre-flight,
+the cascade delete result, run graphs, the schema graph and the update pipeline.
+
+`POST /meta-tables/{uid}/namespaces/changes/` with `{"add": [...], "remove": [...]}`
+adds the table to existing namespaces and removes it from others in one request, and
+returns its `namespaces`. Adding needs `tables.update` on the table and `tables.create`
+on the namespace; removing needs `tables.create` on the namespace. A refusal answers
+403 with `table_access_required` or `namespace_access_required`. Removing the last
+namespace of a table that has no direct `owner` answers 409 with `last_namespace`.
+`PATCH` does not accept a namespace.
+
 Contract validation is independent of physical execution. Existing-resource
 validation requires visibility. Introspection requires appropriate access and a
 capable current DataSource; it reflects columns, indexes, constraints, and physical
@@ -24,8 +41,8 @@ at most 100) results, each with the normal table projection, a fused `score` and
 the `matched_columns` whose name or logical name contains a query word.
 
 Each table has one search document built only from its own metadata: identifier,
-physical name, description, labels, time index and cadence, namespace and its
-description, and every column's name, type, logical name, label and description.
+physical name, description, labels, time index and cadence, every namespace it is in
+with its description, and every column's name, type, logical name, label and description.
 It never names another table. The document is rewritten in every catalog
 transaction that changes that metadata, so keyword ranking (BM25 over split and
 stemmed words) is never stale. The API embeds documents in the background with the
@@ -141,6 +158,16 @@ before accepting a binding.
 The response reports each table separately; failures may coexist with successes.
 Only successful reconciliation makes a reserved binding active.
 
+A registration or reservation carries `namespaces`, the list of names the new table is
+created in. The caller needs `tables.create` on each; a missing namespace is created.
+Registering an existing table again never changes its namespaces: `register` answers
+with `registration.namespaces_not_applied`, the declared names the table is not in.
+An application's migration changes them at finalization instead:
+`authored_metadata[uid].namespaces` is the list the code declares, and the API adds the
+missing `declared` memberships and removes the `declared` ones no longer listed. It
+does so only when the request names the table's migration provider; otherwise that
+table fails with `provider_required`.
+
 ## SQL execution
 
 `POST /meta-tables/execute-operation/` accepts `compiled-sql.v1`, a
@@ -149,6 +176,26 @@ parameter types and limits. It accepts at most 1,000,000 SQL characters. Row lim
 default to 1,000 and are capped at 10,000; time limits default to 15 seconds and are
 capped at 60 seconds. `operation="select"` selects read mode; the other operation
 labels select write mode. They do not classify SQL.
+
+`POST /meta-tables/execute-transaction/` accepts the same fields with `statements`,
+a list of 1 to 32 statements, in place of `statement`, and a write operation
+(`insert`, `update`, `delete` or `upsert`). Each statement may add `expect_rows`
+(an exact count or `"at_least_one"`) and a `label`. The API runs them in order in
+one write transaction, commits after the last and rolls back on any error. It
+returns the last statement's rows in the `execute-operation` shape; the limits cover
+the whole list. Its errors:
+
+| Status | Code | When |
+| --- | --- | --- |
+| 400 | `compiled_sql_database_error` | A statement failed in the database; the body adds `statement_index` and `label`. |
+| 400 | `compiled_sql_transaction_ended` | Caller SQL ended or controlled the API's transaction (PostgreSQL). |
+| 400 | `sql_deadline_exceeded` | The list ran past its time limit. |
+| 409 | `compiled_sql_guard_failed` | A statement missed `expect_rows`; the body adds `statement_index`, `label`, `expect_rows` and `row_count`. |
+| 422 | `compiled_sql_statement_list_unsupported` | The DataSource is MySQL or SQL Server. |
+| 422 | `compiled_sql_dialect_mismatch` | A statement's dialect or paramstyle differs from the DataSource's. |
+| 422 | (request validation) | A read operation, an empty or longer list, or an invalid `expect_rows`. |
+
+See [ADR 0026](../adr/api/0026-atomic-statement-lists.md).
 
 `POST /meta-tables/run-query/` accepts `{"data_source_uid": "…", "sql": "…"}` and
 optional `limits`. It uses the same restricted execution path in read mode and

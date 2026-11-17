@@ -123,7 +123,8 @@ It creates its namespace by registering its first table there:
 2. **The first migration creates the namespace.** When a provider's tables name a
    namespace that does not exist in this Environment, the Job's registration creates
    it and grants the Job `editor`. The namespace records the Job as its creating
-   workload. Later runs and new tables need nothing more.
+   workload. Later runs and new tables need nothing more. A provider whose tables
+   declare several namespaces creates each missing one the same way.
 3. **Grant the other workloads, and an owner.** The people who manage the Job in the
    platform manage the namespace's access. In that Environment's Admin, open the
    namespace's **Access** panel, find each workload by its Job or release name, and
@@ -169,6 +170,9 @@ from then on that owner manages it.
 
 One namespace per application is the recommended layout, not a rule; see
 [Namespaces and applications](../security/ownership-and-sharing.md#namespaces-and-applications).
+To share part of the application's tables, declare a further namespace on those tables
+instead of scaffolding another provider; see
+[Put tables in namespaces](define-and-migrate-tables.md#put-tables-in-namespaces).
 
 The Job also needs the platform's `reader` policy on the MetaTables branch, which
 gives it `viewer` on the branch's `metatables` release, to discover the API. Declare it
@@ -188,7 +192,9 @@ on the Job (workflow API `3.0.0`):
 
 `upgrade_application()` waits up to five minutes for the API to wake or finish
 replacing its pods before it fails with `ApiResolutionError`; other client calls
-wait 30 seconds. Within the same budget, the runtime-context request is retried
+wait 30 seconds. That includes a rollout of a new API revision, which the platform
+can report as unavailable until it completes; an API whose revision failed is not
+waited for. Within the same budget, the runtime-context request is retried
 while the API answers 502, 503 or 504, for example while it cannot yet verify
 callers; the final error keeps the API's last detail.
 
@@ -205,9 +211,17 @@ the database.
 - **`namespace_required`**: a workload tried to create a table outside any namespace.
   Set the table's namespace.
 - **`table_not_editable`**: the table already exists and the caller lacks
-  `tables.update` on it. An owner of the table or its namespace grants `editor`.
+  `tables.update` on it. An owner of the table or of one of its namespaces grants
+  `editor`.
+- **`last_namespace`**: the code no longer declares the only namespace the table is
+  in. Keep one namespace on the model, or grant a person or Team `owner` on the table.
 
-After the grant, re-run the Job. Do not run the Job as an Organization admin
+A refused namespace on an existing table fails that table's finalization and leaves its
+namespaces as they were; the other tables are finalized.
+
+After the grant, or after adding the workload User to a Team that holds the role,
+re-run the Job. A refusal is rechecked against current Team membership before it
+stands, so the re-run needs no wait. Do not run the Job as an Organization admin
 or change physical names to get around a refusal.
 
 ## What the Job guarantees

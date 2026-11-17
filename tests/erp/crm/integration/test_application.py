@@ -31,7 +31,7 @@ def _catalog_rows():
                 physical_table_name=model.__tablename__,
                 physical_schema=None,
                 provisioning_status="active",
-                namespace="mainsequence-crm",
+                namespaces=[SimpleNamespace(name="mainsequence-crm")],
                 migration_namespace="mainsequence-crm",
                 management_mode="platform_managed",
                 schema_management_mode="alembic_managed",

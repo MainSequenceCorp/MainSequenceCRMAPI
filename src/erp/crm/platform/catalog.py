@@ -50,7 +50,7 @@ class CatalogRegistry:
             if (
                 row.physical_table_name != physical
                 or row.physical_schema not in (None, "", "public")
-                or row.namespace != "mainsequence-crm"
+                or not any(namespace.name == "mainsequence-crm" for namespace in row.namespaces)
                 or row.migration_namespace != "mainsequence-crm"
                 or row.management_mode != "platform_managed"
                 or row.schema_management_mode != "alembic_managed"

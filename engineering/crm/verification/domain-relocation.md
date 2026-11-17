@@ -7,14 +7,16 @@ workflow, agent, migration revision or database schema was introduced.
 Both working trees were backed up before moving files. Fetched remote changes
 were reconciled with existing local work, including localization. API business
 source matches the current remote after mechanical import/path rebasing. Frontend
-business source retains the pre-existing localization work. SDK dependencies
-were restored to the repository's existing lockfile; no dependency update was authored.
+business source retains the pre-existing localization work. SDK dependencies were first restored to the existing lockfile. The user then
+explicitly authorized upgrading MetaTables to 0.1.67 after the current hosted
+API exposed namespace memberships through `namespaces`. CRM now consumes the
+current contract directly; no singular-field fallback was added.
 
 | Check | Local evidence |
 | --- | --- |
 | File inventory | Every original file has an existing destination; no missing content paths |
 | Maintainer/project-skill links | All local Markdown targets resolve in both repositories |
-| API suite | 421 passed using disposable SQLite/PostgreSQL; no skipped tests |
+| API suite | 423 passed with MetaTables 0.1.67 using disposable SQLite/PostgreSQL; no skipped tests |
 | API documentation | Strict MkDocs build passed; mounted-route documentation tests passed |
 | Frontend cases | 32 passed with Node 24; test discovery points to CRM-owned suites |
 | Frontend build | TypeScript, Vite and Docusaurus passed; app and `dist/docs/` produced |

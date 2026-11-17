@@ -37,7 +37,7 @@ def catalog_rows(**overrides):
             "physical_table_name": model.__tablename__,
             "physical_schema": None,
             "provisioning_status": "active",
-            "namespace": "mainsequence-crm",
+            "namespaces": [SimpleNamespace(name="mainsequence-crm")],
             "migration_namespace": "mainsequence-crm",
             "management_mode": "platform_managed",
             "schema_management_mode": "alembic_managed",
@@ -135,6 +135,8 @@ def test_missing_prompt_names_the_required_migration_job(monkeypatch):
     [
         {"provisioning_status": "reserved"},
         {"migration_namespace": "other"},
+        {"namespaces": []},
+        {"namespaces": [SimpleNamespace(name="other")]},
         {"physical_table_name": "wrong_table"},
         {"schema_management_mode": "external_registered"},
         {"alembic_revision": "0001"},

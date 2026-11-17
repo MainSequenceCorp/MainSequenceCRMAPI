@@ -232,8 +232,8 @@ revisions with the selected environment connection; the MetaTables API
 reserves and finalizes the catalog bindings.
 
 Nothing migrates at HTTP startup. A fresh API process queries the platform catalog
-for the 26 authored identifiers, validates active Alembic-managed bindings,
-namespace, provider, revision, physical names and one data source, then caches
+for the 36 authored identifiers, validates active Alembic-managed bindings,
+membership in `mainsequence-crm`, provider, revision, physical names and one data source, then caches
 the typed bindings in memory. Governed operations select that data source. It
 must not register tables or repair schema during a request. No CRM bindings
 file, finalization hook, or path variable is required by the CLI or API.
@@ -421,3 +421,17 @@ association. Historical batch capture, this explicit association and audit commi
 atomically. Contact merge moves a sole Lead and preserves its association; two
 Lead contexts block merge rather than silently collapsing their statuses or
 next actions. No source grant or message body is copied by a merge.
+
+## Current MetaTables catalog contract (2026-11-17)
+
+CRM requires `mainsequence-metatable>=0.1.67,<0.2` and the checked lockfile selects
+0.1.67. The current API returns each table's namespace memberships in `namespaces`.
+Catalog validation requires membership in `mainsequence-crm`; extra memberships
+are allowed, and missing membership remains a readiness failure. No singular
+`namespace` response field or legacy parsing fallback is used. SQLAlchemy models
+continue to declare their authored primary namespace through the client contract.
+
+The provider key, table UIDs, physical names and migration revision `0015` are
+unchanged by this SDK upgrade and directory relocation. The migration workflow
+continues through `jobs/migrate_crm.py`, which resolves its CRM-owned implementation
+by file location and does not depend on importing a `jobs` package.

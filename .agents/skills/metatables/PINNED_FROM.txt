@@ -1,7 +1,7 @@
 schema=1
 library_name=mainsequence-metatable
 namespace=metatables
-pinned_version=0.1.51
-skills_path=/Users/jose/mainsequence-dev/main-sequence-workbench/projects/mainsequencecrmapi-b825d486-6f2f-42da-a79b-08e53f2fb2d5/.venv/lib/python3.13/site-packages/metatables/_client_skills
-copied_at_utc=2026-10-20T14:17:50Z
+pinned_version=0.1.67
+skills_path=/home/jose/mainsequence-dev/main-sequence-workbench/projects/mainsequencecrmapi-b825d486-6f2f-42da-a79b-08e53f2fb2d5/.venv/lib/python3.13/site-packages/metatables/_client_skills
+copied_at_utc=2026-11-17T09:39:54Z
 command=metatables copy-metatables-skills

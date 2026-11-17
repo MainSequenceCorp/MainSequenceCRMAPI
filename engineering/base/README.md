@@ -23,9 +23,10 @@ Do not import CRM, add Base tables to another module's metadata, modify an appli
 revision, or create tables at startup. Subsequent schema changes require a new
 Base revision and an updated readiness expectation.
 
-The frontend is independently maintained in the companion repository under
-`src/erp/base/`, `apps/base/`, `config/erp/base/`, `docs/base/` and
-`documentation/base/`. Its editor consumes API input schemas and capabilities;
+Business Directory is the user-facing module in the companion repository under
+`src/erp/base/`, `docs/base/` and `documentation/base/`. It shares one ERP static
+site, root build and main left navigation with CRM and future modules. Its
+editor consumes API input schemas and capabilities;
 its types and forms do not own storage. No Agent or MCP surface is introduced.
 
 ## Local setup and first run
@@ -55,9 +56,11 @@ preserves existing operator edits. It does not migrate or seed CRM. The local
 launcher verifies the existing SDK identity and rejects external origins,
 non-loopback callers and supplied identity headers. Never expose it publicly.
 
-From the companion frontend repository with Node 24, run `npm run dev:base`.
+From the companion frontend repository with Node 24, run `npm run dev`.
 The application listens on `http://127.0.0.1:5175/` and proxies Base requests to
-port 38651. Follow its engineering guide for the separately built user guide.
+port 38651. CRM uses its separate local API on port 38641. The one root
+`npm run build` artifact contains both modules and their user guides; Business
+Directory help is at `/docs/directory/`. Follow the companion engineering guide.
 
 ## API use and integrity
 
@@ -119,7 +122,8 @@ Do not replace this evidence with mocked authentication or remote fixtures.
 
 No Base declaration is installed under `.mainsequence/workflows/`. A future
 Base-only workflow must pair its API with its own migration Job and select only
-Base release tags; the companion frontend has a separate artifact and workflow.
+Base release tags. The companion repository retains one shared ERP artifact and
+workflow, released with an ERP UI tag only when its code/configuration changes.
 Prepare and validate that exact release and production-engine behavior before
 requesting user approval. No triggering push, tag, hosted migration or platform
 deployment is permitted until explicitly approved. Local verification does not

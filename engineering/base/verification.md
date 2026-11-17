@@ -18,7 +18,7 @@ and the platform approval gate. No push or release tag was created.
 | Backend tests | `.venv/bin/pytest tests/erp/base -q`: **18 passed**, one upstream Starlette deprecation warning | Passed |
 | Static checks | Ruff on Base service, API, migration, scripts, Job, tests and module registry | Passed |
 | First API deployment | Loopback Uvicorn `api.erp.base.local:create_app`, port 38651, actual SDK sign-in and local SQLite | Verified locally |
-| Companion frontend | Independent app/guide build, actual local API browser flows, six SDK viewports, light/dark presets | Verified locally |
+| Companion frontend | Business Directory in the shared ERP app/guide artifact, actual local API browser flows, six SDK viewports, light/dark presets | Verified locally |
 | CRM regression | Existing suite: **365 passed, 58 skipped**; skipped checks remain unverified | Passed with stated skips |
 | Platform deployment | No hosted Base migration, resource release, active Base workflow, push or tag | Awaiting approval |
 | Hosted frontend integration | Actual Command Center host, workload grants, Teams and production storage engine | Not performed |

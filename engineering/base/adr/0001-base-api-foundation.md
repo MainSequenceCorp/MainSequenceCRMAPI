@@ -7,8 +7,8 @@ platform release requires explicit user approval after local verification.
 
 Future modules need shared business identities and reference data without
 depending on CRM's prospecting model or migration history. Build ERP Base as an
-independent API module in this repository, with a companion independently built
-frontend in the existing frontend repository. No CRM data moves in this step.
+independent API module in this repository, with companion Business Directory screens
+in the one ERP static site maintained in the existing frontend repository. No CRM data moves in this step.
 
 This ADR covers backend API extension, persistent models, migration ownership,
 authorization, concurrency, compatibility and local delivery. New Agents and MCP
@@ -129,8 +129,9 @@ and companion frontend locally and verify actual user flows together.
 
 The future platform deployment unit is a Base-only API entrypoint and its own
 migration Job, selected by a Base workflow and `v<major>.<minor>.<patch>-base`
-tags. Base has no CRM runtime prerequisite. The frontend has its own build root
-and release. Candidate deployment declarations stay outside the active workflow
+tags. Base has no CRM runtime prerequisite. Business Directory joins the shared
+ERP frontend artifact and UI release; it has no separate static-site resource or
+build root. Candidate deployment declarations stay outside the active workflow
 directory until approval and backend validation; no push, release tag or
 platform reconciliation is authorized by this ADR. Platform ownership/Team
 setup, exact workflow validation and production-engine behavior must be checked

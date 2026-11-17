@@ -1,0 +1,9 @@
+site_name: Collaboration API
+site_url: http://127.0.0.1:38711/
+docs_dir: ../../docs/collaboration
+site_dir: ../../.local/docs/collaboration
+nav:
+  - Overview: index.md
+  - Concepts: concepts.md
+  - API: api.md
+  - Local delivery: delivery.md

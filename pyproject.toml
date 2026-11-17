@@ -91,7 +91,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/erp/crm"]
+testpaths = ["tests/erp"]
 
 [tool.uv.sources]
 ms-tau-sdk = { git = "https://github.com/mainsequence-sdk/ms-tau-sdk.git", rev = "v3.0.2" }

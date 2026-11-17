@@ -9,6 +9,11 @@ CRM extraction is a separate later step. Each module owns its models and
 migration history and follows ADR, development, testing, deployment and frontend
 integration. Module API ADRs exclude new Agent and MCP work.
 
+Base work under `src/erp/base/`, `api/erp/base/`, `tests/erp/base/`,
+`docs/base/`, `documentation/base/`, `engineering/base/`, `apps/base/`, and
+Base configuration/scripts/jobs must read [.agents/domains/base/AGENTS.md](.agents/domains/base/AGENTS.md)
+before editing. This includes Base module registration and build composition.
+
 Maintain each business domain independently. CRM work in `src/erp/crm/`,
 `api/erp/crm/`, `src/agents/crm/`, `api/agents/crm/`, `tests/erp/crm/`,
 `docs/crm/`, `documentation/crm/`, `engineering/crm/`, `scripts/erp/crm/`,

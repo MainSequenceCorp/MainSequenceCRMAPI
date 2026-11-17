@@ -312,8 +312,12 @@ class Service:
         )
         return self.get(uid)
 
-    def attach(self, uid, expected_version, consumer, record_uid):
-        """Public owner command for explicitly authorized later integrations."""
+    def plan_attach(self, uid, expected_version, consumer, record_uid):
+        """Owner-authored statements for an atomic integration on the same DataSource.
+
+        Callers must execute the complete plan with their own guarded changes.
+        Sales retains authorization, state/version checks and audit ownership.
+        """
         self.require("sales.configure")
         uid = UUID(str(uid))
         row = self.get(uid)
@@ -325,28 +329,31 @@ class Service:
                 409, "invalid_state", "Only confirmed orders accept downstream records"
             )
         if key in row["downstream"]:
-            return row
+            return []
         links = {**row["downstream"], key: True}
-        self.transact(
-            [
-                GuardedStatement(
-                    update(Order)
-                    .where(
-                        Order.uid == uid,
-                        Order.version == expected_version,
-                        Order.state == "confirmed",
-                    )
-                    .values(
-                        downstream=links,
-                        version=expected_version + 1,
-                        updated_at=datetime.now(timezone.utc),
-                        updated_by_uid=self.actor_uid,
-                    )
-                    .returning(Order.uid),
-                    expect_rows=1,
-                    label="order_version",
-                ),
-                self.audit(uid, "link", expected_version + 1, ["downstream"]),
-            ]
-        )
+        return [
+            GuardedStatement(
+                update(Order)
+                .where(
+                    Order.uid == uid,
+                    Order.version == expected_version,
+                    Order.state == "confirmed",
+                )
+                .values(
+                    downstream=links,
+                    version=expected_version + 1,
+                    updated_at=datetime.now(timezone.utc),
+                    updated_by_uid=self.actor_uid,
+                )
+                .returning(Order.uid),
+                expect_rows=1,
+                label="order_version",
+            ),
+            self.audit(uid, "link", expected_version + 1, ["downstream"]),
+        ]
+
+    def attach(self, uid, expected_version, consumer, record_uid):
+        steps = self.plan_attach(uid, expected_version, consumer, record_uid)
+        if steps:
+            self.transact(steps)
         return self.get(uid)

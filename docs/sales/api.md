@@ -58,3 +58,10 @@ validation uses FastAPI's 422 `detail` list. Common statuses: 403 capability den
 404 missing reference/record, 409 stale version/duplicate/invalid lifecycle or
 downstream guard, 422 invalid business input, 503 unavailable storage/identity/CRM.
 Clients must not automatically replay writes after a timeout or server error.
+
+Finance integration uses the public owner-authored `Service.plan_attach` command
+plan. It validates Sales permissions, confirmed state, version and link limits,
+then returns guarded Sales statements plus its audit event for an atomic
+same-DataSource transaction. Finance never imports Sales table models or writes
+Sales tables independently. `attach` still executes that same plan for existing
+callers. A failed Finance invoice insert rolls back the Sales link and version.

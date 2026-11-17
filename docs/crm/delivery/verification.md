@@ -2554,3 +2554,15 @@ unit and guide checks; real-browser adoption and bidirectional edits. See
 evidence is in `engineering/crm/base-adoption/verification.md`. Platform release,
 triggering pushes/tags, hosted migration and live external Google/Tau verification
 are not claimed.
+
+## Local Projects regression follow-up (17 November 2026)
+
+The cross-module suite exposed a pre-existing list/detail timestamp mismatch:
+PostgreSQL JSON trims trailing fractional zeros, while detail reads retained the
+authored Pydantic normalization. Collections validated but discarded that normalized
+result. They now return it. The existing owned local PostgreSQL note fixture pins
+a timestamp ending in `.120000` to reproduce the defect deterministically. It
+failed before the fix; the final full ERP suite passed 512 tests, including the
+deterministic regression (41 existing deprecation warnings). Projects verification
+records the cross-module evidence.
+No CRM schema, mutation semantics, Agent/MCP surface, push or deployment changed.

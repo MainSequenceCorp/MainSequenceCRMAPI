@@ -132,6 +132,10 @@ def test_note_title_migration_on_postgresql_and_future_columns(prompts_api, prom
     })
     assert created.status_code == 201, created.text
     legacy = created.json()
+    # PostgreSQL JSON trims trailing fractional zeros; detail reads normalize them.
+    # Pin this owned fixture timestamp so list/detail parity is deterministic.
+    prompts_db.execute(sa.text("UPDATE mainsequence_crm__note SET created_at='2026-10-16T12:32:18.120000Z', updated_at='2026-10-16T12:32:18.120000Z' WHERE uid=:uid"), {"uid": legacy["uid"]})
+    legacy = client.get(f"/api/crm/v1/notes/{legacy['uid']}/").json()
     assert legacy["title"] is None
     revision = importlib.import_module("src.erp.crm.migrations.versions.mainsequence_crm.0012_add_note_title")
     with Operations.context(MigrationContext.configure(prompts_db)):

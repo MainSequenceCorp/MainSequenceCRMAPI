@@ -42,3 +42,6 @@ search matches both title and body.
 See the [engagement API](../api/engagement.md) for the task and note endpoints.
 
 An email follow-up can reference its stored source message. Completion or archive clears a Lead next-task pointer; reopening does not silently select it again. See [Emails](emails.md).
+
+Note lists and detail reads use the same normalized date representation, including
+fractional seconds. This changes no stored note date, history or authorship.

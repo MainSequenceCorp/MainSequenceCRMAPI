@@ -63,8 +63,10 @@ class ResourceReads(GovernedGateway):
         total = int(rows[0].get("total_items", 0))
         page_index = int(scope.page_index)
         page_size = int(scope.page_size)
-        for item in items:
+        items = [
             validate_payload(definition.collection_contract or definition.contract, item)
+            for item in items
+        ]
         return {
             "items": items,
             "pageInfo": {

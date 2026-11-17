@@ -65,6 +65,9 @@ count run in one governed statement; related fields are not computed for
 off-page records merely to calculate the total. Ordering uses the published
 key with nulls last and a UID tie-breaker, preserved in the response array.
 Deal amounts sort numerically while remaining decimal strings in responses.
+Collection items retain the authored contract normalization, matching detail
+responses for values such as timezone-aware timestamps and fractional seconds.
+Database JSON formatting does not bypass this response boundary.
 
 Discovery accepts only `search` and `filters`; it rejects pagination and
 ordering. Unknown parameters and filter keys are rejected. UUID filters must

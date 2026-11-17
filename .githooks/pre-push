@@ -1,4 +1,4 @@
 #!/bin/sh
 set -eu
 cd "$(git rev-parse --show-toplevel)"
-exec .venv/bin/python scripts/verify_local_agent.py --pre-push
+exec .venv/bin/python scripts/erp/crm/agent/verify_local_agent.py --pre-push

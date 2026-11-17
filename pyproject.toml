@@ -28,7 +28,7 @@ where = ["."]
 include = ["src*", "api*", "config*",]
 
 [tool.setuptools.package-data]
-config = ["crm.yaml"]
+"config.erp.crm" = ["settings.yaml"]
 
 [tool.ruff]
 line-length = 100                 # Max line length for Ruff/Black.
@@ -91,7 +91,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/erp/crm"]
 
 [tool.uv.sources]
 ms-tau-sdk = { git = "https://github.com/mainsequence-sdk/ms-tau-sdk.git", rev = "v2.0.26" }

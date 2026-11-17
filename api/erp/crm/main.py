@@ -1,0 +1,188 @@
+"""FastAPI release entrypoint for CRM."""
+
+import asyncio
+import uuid
+
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+from api.erp.crm.affiliation_routes import router as affiliation_router
+from api.erp.crm.email_routes import router as email_router
+from api.erp.crm.campaign_routes import router as campaign_router
+from api.erp.crm.google_routes import mount_public_routes as mount_google_public_routes
+from api.erp.crm.google_routes import router as google_router
+from api.erp.crm.mcp_server import install_crm_mcp
+from api.erp.crm.record_routes import core_router, module_router
+from api.erp.crm.resource_routes import router as resource_router
+from api.erp.crm.routes import router as crm_router
+from api.erp.crm.transfer_routes import router as transfer_router
+from mainsequence.server.fastapi import install_request_identity
+from src.agents.crm.discovery import resolve_assistant
+from src.erp.crm.campaigns.config import campaigns_enabled
+from src.erp.crm.config import crm_config
+from src.erp.crm.google_workspace.config import google_workspace_enabled
+from src.erp.crm.models.bootstrap import Bootstrap
+from src.erp.crm.platform.hosted_runtime import install_platform_services
+from src.erp.crm.platform.readiness_errors import report_readiness_failure
+from src.erp.crm.platform.runtime import authenticated_actor, readiness, request_port
+from src.erp.crm.solution_selling.config import solution_selling_enabled
+
+BOOTSTRAP_STAGE_TIMEOUT_SECONDS = 75
+
+
+def create_app() -> FastAPI:
+    crm_config()  # Fail before route mounting if the persisted configuration is invalid.
+    application = FastAPI(title="Main Sequence CRM", version="0.1.0")
+    application.state.crm_local_tau_origin = None
+    install_platform_services(application)
+
+    @application.middleware("http")
+    async def request_uid(request: Request, call_next):
+        request.state.crm_request_uid = uuid.uuid4()
+        return await call_next(request)
+
+    @application.exception_handler(HTTPException)
+    async def http_error(request: Request, exc: HTTPException):
+        code = {401: "IDENTITY_REQUIRED", 403: "PERMISSION_DENIED", 503: "CRM_NOT_READY"}.get(
+            exc.status_code, "CRM_REQUEST_ERROR"
+        )
+        return JSONResponse(_error(request, code, str(exc.detail)), status_code=exc.status_code)
+
+    @application.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError):
+        fields = [
+            {
+                "path": ".".join(map(str, issue["loc"])),
+                "code": issue["type"],
+                "message": "Invalid value",
+            }
+            for issue in exc.errors()
+        ]
+        return JSONResponse(
+            _error(request, "VALIDATION_ERROR", "Request validation failed", fields),
+            status_code=422,
+        )
+
+    application.add_api_route("/healthz", healthz, methods=["GET"])
+    application.add_api_route("/api/crm/v1/readiness/", crm_readiness, methods=["GET"])
+    application.add_api_route("/api/crm/v1/bootstrap/", bootstrap, methods=["GET"])
+    application.include_router(crm_router)
+    application.include_router(resource_router)
+    application.include_router(email_router)
+    application.include_router(affiliation_router)
+    application.include_router(transfer_router)
+    if google_workspace_enabled():
+        mount_google_public_routes(application)
+        application.include_router(google_router)
+    application.include_router(core_router)
+    if solution_selling_enabled():
+        application.include_router(module_router)
+    if campaigns_enabled():
+        application.include_router(campaign_router)
+    # Once, after every route is mounted, so the deployment's public ingress
+    # routes can be checked and caller verification runs before any CRM
+    # middleware or route: a platform-signed caller assertion when deployed, a
+    # direct Bearer token locally. authenticated_actor() reads the result.
+    install_request_identity(application)
+    install_crm_mcp(application)
+    return application
+
+
+def _error(request: Request, code: str, message: str, fields: list[dict] | None = None) -> dict:
+    value = {
+        "code": code,
+        "message": message,
+        "request_uid": str(getattr(request.state, "crm_request_uid", uuid.uuid4())),
+    }
+    if fields is not None:
+        value["fields"] = fields
+    return {"error": value}
+
+
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+async def _bounded_readiness(request: Request, actor_uid) -> dict:
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(readiness, request, actor_uid),
+            timeout=BOOTSTRAP_STAGE_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as exc:
+        step = getattr(request.state, "crm_readiness_step", "platform-readiness")
+        labels = {
+            "policy": "CRM policy connection",
+            "catalog": "Main Sequence MetaTable catalog",
+            "crm-settings": "CRM settings",
+            "directory": "Main Sequence user directory",
+            "bootstrap": "CRM settings and default pipeline",
+            "authorization": "CRM policy authorization",
+        }
+        label = labels.get(step, "CRM platform readiness")
+        return {
+            "status": "not_ready",
+            "schema_version": "1",
+            "application_version": "0.1.0",
+            "checks": [{
+                "id": step,
+                "status": "failed",
+                "message": report_readiness_failure(
+                    request, step, exc,
+                    f"{label} did not respond within {BOOTSTRAP_STAGE_TIMEOUT_SECONDS:g} seconds.",
+                ),
+            }],
+        }
+
+
+async def crm_readiness(request: Request, actor_uid=Depends(authenticated_actor)):
+    result = await _bounded_readiness(request, actor_uid)
+    return JSONResponse(result, status_code=200 if result["status"] == "ready" else 503)
+
+
+async def bootstrap(request: Request, actor_uid=Depends(authenticated_actor)):
+    result = await _bounded_readiness(request, actor_uid)
+    if result["status"] != "ready":
+        payload = _error(request, "CRM_NOT_READY", "CRM setup is incomplete.")
+        payload["readiness"] = result
+        return JSONResponse(
+            payload,
+            status_code=503,
+        )
+    bootstrap_port = request_port(request, "crm_bootstrap")
+    if bootstrap_port is None:
+        return JSONResponse(
+            _error(request, "CRM_NOT_READY", "CRM bootstrap service is unavailable."),
+            status_code=503,
+        )
+    try:
+        document = getattr(request.state, "crm_bootstrap_document", None)
+        if document is None:
+            document = await asyncio.wait_for(
+                asyncio.to_thread(bootstrap_port.read, actor_uid),
+                timeout=BOOTSTRAP_STAGE_TIMEOUT_SECONDS,
+            )
+        document["readiness"] = result
+        document["assistant"] = await resolve_assistant(
+            request.app.state.crm_local_tau_origin
+        )
+        return Bootstrap.model_validate(document).model_dump(mode="json")
+    except TimeoutError as exc:
+        return JSONResponse(
+            _error(request, "CRM_NOT_READY", report_readiness_failure(
+                request, "bootstrap", exc,
+                f"Main Sequence CRM settings or default pipeline did not respond within {BOOTSTRAP_STAGE_TIMEOUT_SECONDS:g} seconds.",
+            )),
+            status_code=503,
+        )
+    except Exception as exc:
+        return JSONResponse(
+            _error(request, "CRM_NOT_READY", report_readiness_failure(
+                request, "bootstrap", exc, "CRM settings are unavailable.",
+            )),
+            status_code=503,
+        )
+
+
+app = create_app()

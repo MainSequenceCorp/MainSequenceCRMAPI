@@ -1,6 +1,6 @@
 site_name: Main Sequence CRM API
 site_description: Concepts, HTTP API, and delivery guidance for the CRM service.
-docs_dir: docs
+docs_dir: docs/crm
 site_dir: site
 theme:
   name: mkdocs

@@ -1,0 +1,143 @@
+"""Application service and explicit local-runtime integration checks."""
+
+from __future__ import annotations
+
+import uuid
+from types import SimpleNamespace
+
+import pytest
+from fastapi.testclient import TestClient
+
+from api.erp.crm.local import create_app
+from metatables.compiled_sql.v1 import compile_sqlalchemy_statement
+from src.erp.crm.metatables import MODELS
+from src.erp.crm.models.bootstrap import Bootstrap
+from src.erp.crm.platform.local_runtime import LocalSdkUserPolicy
+
+ACTOR = uuid.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+OTHER_ACTOR = uuid.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab")
+PIPELINE = uuid.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+DATA_SOURCE = uuid.UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd")
+
+
+def _catalog_rows():
+    rows = []
+    for number, model in enumerate(MODELS.values(), 1):
+        rows.append(
+            SimpleNamespace(
+                uid=uuid.UUID(int=number),
+                data_source_uid=DATA_SOURCE,
+                identifier=model.__metatable_identifier__,
+                physical_table_name=model.__tablename__,
+                physical_schema=None,
+                provisioning_status="active",
+                namespace="mainsequence-crm",
+                migration_namespace="mainsequence-crm",
+                management_mode="platform_managed",
+                schema_management_mode="alembic_managed",
+                migration_provider_key="crm-provider",
+                alembic_revision="0003",
+            )
+        )
+    return rows
+
+
+def _settings_row():
+    return {
+        "default_currency": "EUR",
+        "timezone": "Europe/Vienna",
+        "configuration_version": 1,
+        "configuration": {
+            "company_sectors": [{"value": "software", "label": "Software"}],
+            "contact_statuses": [{"value": "warm", "label": "Warm"}],
+            "deal_categories": [{"value": "new-business", "label": "New business"}],
+            "task_types": [{"value": "follow-up", "label": "Follow up"}],
+        },
+        "default_pipeline_uid": str(PIPELINE),
+    }
+
+
+@pytest.mark.parametrize("dialect", ["postgresql", "sqlite"])
+def test_local_runtime_is_ready_and_bootstrap_is_a_governed_read(monkeypatch, local_sign_in, dialect):
+    # Bootstrap resolves the assistant: Tau /ready when a local origin is set,
+    # then the platform Agent. Keep both inside the test process.
+    monkeypatch.delenv("CRM_LOCAL_TAU_ORIGIN", raising=False)
+    agent_lookups = []
+    monkeypatch.setattr(
+        "src.agents.crm.discovery._platform_agent",
+        lambda name: agent_lookups.append(name),
+    )
+    monkeypatch.setattr(
+        "src.erp.crm.platform.catalog.MetaTable.filter", lambda **filters: _catalog_rows()
+    )
+    local_sign_in.as_user(
+        SimpleNamespace(
+            uid=str(ACTOR),
+            username="local@example.test",
+            email="local@example.test",
+            first_name="Local",
+            last_name="Operator",
+        )
+    )
+    operations = []
+    monkeypatch.setattr(
+        "src.erp.crm.services.application.compile_sqlalchemy_statement",
+        lambda statement, **kwargs: compile_sqlalchemy_statement(statement, dialect=dialect, **kwargs),
+    )
+
+    def execute(operation):
+        operation = operation.model_dump(mode="json")
+        operations.append(operation)
+        sql = operation["statement"]["sql"]
+        if sql.startswith("SELECT key FROM"):
+            return {"rows": [{"key": "default"}]}
+        assert "JOIN" in sql and "mainsequence_crm__pipeline" in sql
+        assert operation["dialect"] == dialect
+        assert "default" in operation["statement"]["parameters"].values()
+        assert 2 in operation["statement"]["parameters"].values()
+        assert operation["data_source_uid"] == str(DATA_SOURCE)
+        assert operation["limits"]["max_rows"] == 2
+        assert operation["limits"]["statement_timeout_ms"] == 5000
+        return {"rows": [_settings_row()]}
+
+    monkeypatch.setattr("src.erp.crm.services.application.MetaTable.execute_operation", execute)
+    app = create_app()
+    client = TestClient(app, client=("127.0.0.1", 50000))
+
+    readiness = client.get("/api/crm/v1/readiness/")
+    assert readiness.status_code == 200
+    assert readiness.json()["status"] == "ready"
+    assert all(check["status"] == "ready" for check in readiness.json()["checks"])
+    assert "atomic-commands" not in {check["id"] for check in readiness.json()["checks"]}
+
+    response = client.get("/api/crm/v1/bootstrap/")
+    assert response.status_code == 200
+    payload = response.json()
+    Bootstrap.model_validate(payload)
+    assert "workspace_uid" not in payload
+    assert payload["current_user"] == {
+        "uid": str(ACTOR),
+        "display_name": "Local Operator",
+        "selectable": True,
+    }
+    assert payload["default_pipeline_uid"] == str(PIPELINE)
+    assert "crm.read" in payload["capabilities"]
+    assert any("mainsequence_crm__settings" in item["statement"]["sql"] for item in operations)
+    assert all("LIMIT" in item["statement"]["sql"] for item in operations)
+    assert len(operations) == 2  # One governed settings read per request.
+    assert payload["assistant"] == {
+        "enabled": False,
+        "runtime": None,
+        "agent_uid": None,
+        "environment_uid": None,
+        "display_name": "CRM assistant",
+    }
+    assert agent_lookups == ["CRM assistant"]
+    # Each request's caller was the session's user, verified by the backend.
+    assert local_sign_in.backend.lookups == ["Bearer local-session"] * 2
+
+
+def test_local_policy_is_bound_to_authenticated_actor():
+    policy = LocalSdkUserPolicy(ACTOR)
+    assert "crm.read" in policy.capabilities(ACTOR)
+    assert policy.capabilities(OTHER_ACTOR) == set()

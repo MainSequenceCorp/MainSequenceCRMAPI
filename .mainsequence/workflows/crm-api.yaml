@@ -36,7 +36,7 @@ resources:
     spec:
       name: CRM migrations
       description: Applies the CRM MetaTables migrations before the CRM API and assistant roll out.
-      execution_path: jobs/migrate_crm.py
+      execution_path: jobs/erp/crm/migrate.py
       cpu_request: "0.5"
       memory_request: "1"
       max_runtime_seconds: 1800
@@ -57,15 +57,15 @@ resources:
       mcp_applications:
         - resource: crm
       command_center_icon:
-        path: assets/agents/sequence/assets/crm/neutral/idle.png
+        path: assets/erp/crm/agent/sequence/assets/crm/neutral/idle.png
         rendering: color
         image_rendering: auto
       command_center_animations:
         poses:
-          thinking: {path: assets/agents/sequence/assets/crm/neutral/thinking.png}
-          working: {path: assets/agents/sequence/assets/crm/neutral/working.png}
-          outreach: {path: assets/agents/sequence/assets/crm/neutral/working.png}
-          error: {path: assets/agents/sequence/assets/crm/neutral/error.png}
+          thinking: {path: assets/erp/crm/agent/sequence/assets/crm/neutral/thinking.png}
+          working: {path: assets/erp/crm/agent/sequence/assets/crm/neutral/working.png}
+          outreach: {path: assets/erp/crm/agent/sequence/assets/crm/neutral/working.png}
+          error: {path: assets/erp/crm/agent/sequence/assets/crm/neutral/error.png}
         tools:
           - application: crm
             pose: outreach

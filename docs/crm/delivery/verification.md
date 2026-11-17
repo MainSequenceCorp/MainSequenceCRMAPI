@@ -1,0 +1,2504 @@
+# Verification and release
+
+Run the repeatable local checks from the repository root:
+
+```bash
+uv sync --locked
+.venv/bin/pytest -q
+.venv/bin/ruff check api/crm src/crm tests
+.venv/bin/mkdocs build --strict
+```
+
+The strict MkDocs build catches broken navigation and local links. It does
+not prove that the described API behavior works; tests and runtime evidence
+must accompany material changes. The running FastAPI OpenAPI document can be
+compared with the [mounted route index](../api/route-index.md);
+`tests/erp/crm/documentation/test_documentation.py` enforces method/path parity.
+
+### Campaigns module (2026-10-24)
+
+Implemented ADR 0001 end to end: six tables (revision `0013`), the
+`src/erp/crm/campaigns/` domain package, `CampaignStore` governed statements,
+`/extensions/campaigns/` routes, 21 MCP tools, the `crm-campaigns` usage skill
+and core Task/Prompt/merge guards. Executed locally on this checkout:
+
+- `.venv/bin/pytest -q` (the full suite, including `tests/erp/crm/integration/test_campaigns.py`
+  contract, graph, service and MCP/HTTP parity checks, updated catalogue
+  counts of 93/69 tools and migration head `0013`).
+- `CRM_TEST_POSTGRES_DOCKER=1 .venv/bin/pytest -q tests/erp/crm/integration/test_campaign_postgres.py`:
+  five scenarios on a disposable `postgres:17` container, covering the
+  two-contact Dubai example on different paths, duplicate and premature
+  advance, persisted waits, core completion/reopen guards, Task contact
+  reassignment rejection, Prompt archive blocking, merge rejection,
+  withdrawal, layout-only versus material graph edits, stale saves rolling
+  back whole, stale-briefing preservation, resume, cancel with reroute,
+  changed-exposure flags, shared Prompt version bumps, A/B maturity and
+  late-report accounting, and revision `0013` upgrade/downgrade on PostgreSQL.
+- `.venv/bin/ruff check api/crm src/crm tests`, `.venv/bin/mkdocs build --strict`.
+
+Hosted rollout (2026-10-24, commit `5d12f8e` on `main`): the workflow's
+`migrate-crm` Job run 25 reported `0013 (migrated; catalog reconciled)`, the
+`crm` and `tau` deployment runs succeeded, and an authenticated read-only check
+through the release's runtime access returned readiness `ready`,
+`modules.campaigns: true`, 17 mounted `/extensions/campaigns/` routes and empty
+campaign/prompt collections. The paired frontend's workflow file had to move to
+`api_version: 3.0.0` before the platform published the Campaigns build.
+
+Owned hosted fixture (2026-10-24, approved by the user): a disposable
+`E2E fixture fd7c87cf` campaign ran through the deployed API with real
+governed SQL — two step prompts (one specializing an Agent Prompt at version
+2), graph validation and atomic save, stale-save 409, activation, enrollment
+and duplicate rejection, Sarah and Omar on different outcome paths, A/B
+assignment with persisted comparison facts, campaign-context and
+previous-result bindings, four completed core Tasks, an immature comparison
+report, core-completion `outcome_required`, Task reassignment and enrolled
+merge rejection, reconcile reopen, live-edit impact and `step_changed`
+blocking, withdrawal archiving the open Task, and MCP/REST parity — 29 checks
+passed. Cleanup was confirmed afterwards: the campaign, both prompts and all
+three Contacts are archived and no campaign Task is open; activity history
+remains by design. The local MetaTables SQLite runtime cannot run these
+PostgreSQL business statements (`compiled_sql_dialect_mismatch`), so this
+deployed fixture is the write evidence.
+
+A real local Tau agent (`openai-codex/gpt-5.6-luna`) against the Environment's
+data loaded `crm-campaigns`, discovered the 21 tools, made exactly the three
+requested read-only campaign list calls and matched fresh API reads. A live
+assistant executing a campaign Task write and hosted MCP authorization with a
+delegated requester were not exercised. Concurrency across two database connections is covered by the
+`FOR UPDATE` participant lock and unique constraints, exercised on one
+connection only. The real local-agent pre-push gate must run before pushing.
+
+### MCP stage diagnostics (2026-10-22)
+
+The CRM now correlates business calls with server-generated request UUIDs and
+times identity admission, fresh permissions, catalog binding and MetaTables
+round trips separately. Unexpected and unavailable results retain redacted
+public messages and log bounded exception types, stack locations and safe
+upstream status/correlation metadata. Error envelopes add a request reference
+and, when available, the failed stage. No mutation, permission, retry or
+catalog-caching contract changes.
+
+`tests/erp/crm/agent/test_mcp_diagnostics.py` covers signed MCP calls, stage order, warm
+catalogs, permission rechecks, each stage's failure, secret redaction,
+in-progress stalls and concurrent request isolation. These tests replace
+remote catalog and data operations; they do not prove hosted performance.
+Executed locally: **365 tests passed**, Ruff, `git diff --check` and the strict
+MkDocs build passed. The real Tau local-mode check passed with the workflow's
+`openai-codex/gpt-5.6-luna` provider/model, successful CRM MCP read, persisted
+history after restart and a fresh API comparison. Its isolated SQLite evidence
+is under `.local/agent-pre-push/8aa11dde-a7d1-4f35-85bb-7c854ca6f86e/`.
+The pre-push hook repeats the live check for the committed tree. Hosted
+deployment and read/log verification remain unverified here.
+
+### Initial SDK compatibility preflight (2026-10-20)
+
+The first compatibility commit selected Main Sequence `9.0.29`, MetaTables `0.1.50`, and
+Tau `2.0.20`; the paired frontend selects Command Center SDK `0.5.18` and
+Command Center AI `0.0.16`. At that point, published Main Sequence `9.0.30` could not be used
+with MetaTables `0.1.50`: the latter imports `ShareableObjectMixin` from
+`mainsequence.client.base`, and `9.0.30` removed that symbol. The published
+`9.0.29` wheel still provided it. That compatibility commit was pushed as
+`abf6b5d`; its workflow deployment still requires separate verification.
+
+Executed locally with those selected packages: 357 API tests passed, Ruff and
+`metatables.sdk_compat` passed, and the real Tau local-mode verification passed
+with the workflow's `openai-codex/gpt-5.6-luna` model. That check used the real
+CRM MCP bridge, compared its successful read with a fresh API read, and verified
+local session history after restart. Its ignored evidence is under
+`.local/agent-pre-push/981302c5-0f23-4b1c-8144-dcfc4a364083/`.
+The paired frontend passed 33 unit tests, documentation validation, application
+and guide builds, and the SDK theme audit with Node 24. These are local checks;
+hosted migration and release verification still require the workflow run.
+
+The clean compatibility commit passed 343 API tests. Its first pre-push agent
+check rejected two successful reads of `crm-core` skill files, although Tau
+intentionally exposes skill-scoped `read`. The verifier now admits successful
+reads only within `.agents/skills/domains/crm/usage/` and still requires exactly
+the requested CRM MCP call. The real check then passed against revision `0011`;
+evidence is under `.local/agent-pre-push/60c9fe9d-6715-4c18-9fce-8afc0b181d96/`.
+
+### MetaTables 0.1.51 compatibility fix (2026-10-20)
+
+MetaTables `0.1.51` removed the incompatible mixin import. The current API
+lockfile and requirements select Main Sequence `9.0.30`, MetaTables `0.1.51`,
+and Tau `2.0.20`; the SDK-owned Main Sequence and MetaTables skills match the
+installed versions. The full API suite passed **357 tests**. Ruff,
+`metatables.sdk_compat`, direct package imports and `git diff --check` passed.
+The real local agent check passed against a private SQLite catalog at revision
+`0012`, using the workflow's provider/model and the actual CRM MCP bridge. It
+verified a successful business read, persisted local history after restart,
+and compared a fresh API read. Evidence is under
+`.local/agent-pre-push/f1fed05f-06b9-479e-acea-98c1452693cb/`.
+
+The frontend's six isolated browser suites passed on Node 24 with the updated
+Command Center packages, including Notes, startup/retry, Prompts, Prompters,
+async action feedback and the built guide. These checks use disposable local
+fixtures, not hosted CRM data. The hosted schema and API release still require
+the workflow's migration and deployment results.
+
+The pre-push agent may supply a CRM skill path relative to the repository or
+as its absolute path. The verifier resolves either form and requires an existing
+file inside the CRM business skill pack; it still rejects reads outside that
+pack and any non-CRM business calls.
+
+### Workflow 3.0.0 validation (2026-10-20)
+
+The backend rejected the pushed SDK commits' workflow before creating any
+DeploymentRun: workflow API `2.3.0` is no longer supported, and the old
+`level` grants are invalid. The platform's current template advertises
+workflow API `3.0.0`. The first revision declared `policy: reader` on the
+MetaTables branch and `policy: user` between the API and assistant resources.
+It passed static validation and was pushed as `315f5c1`, but the webhook worker
+refused both cross-resource grants: “A workload never gives another workload
+access.” The execution graph was therefore not admitted and created no
+DeploymentRuns. The second revision keeps the MetaTables branch grant and
+omits the peer-workload grants. The authenticated `validate-workflow` endpoint
+returned `valid: true`, no errors, and no warnings. It was pushed as `b773722`;
+its image, migration Job, API release and assistant deployment all succeeded.
+The migration Job reported revision `0011` already current with catalog
+reconciliation. The API active revision is
+`b0a14fb4-d93a-474d-b830-3d3367f58a8a`; authenticated readiness and a
+one-item Notes collection read both returned HTTP 200. Bootstrap returned
+HTTP 200 but `assistant.enabled=false`: the platform removed the former peer
+grants, leaving the API unable to discover the Agent. Automatic approval review
+rejected a persistent direct Agent grant without explicit user authorization;
+no replacement grant was made. Hosted assistant use remains unverified.
+
+## Evidence boundaries
+
+### Frontend async action feedback (2026-10-16)
+
+Implemented in the paired frontend working tree based on `8d7aaf2`. CRM-owned
+actions now use a synchronous exclusion gate and specific operation keys with
+SDK pending buttons and activity indicators. Saving, reading, copying,
+archive/restore, pipeline refresh, quick creation, Google source actions and
+transfer actions show progress and an actual outcome. SDK resource, picker,
+bulk-action and AI-engine lifecycles remain owned by their SDK components.
+The archive/restore confirmation stays open during execution and after failure.
+The shared status includes a standalone SDK indicator, keeping activity visible
+independently of the primary button's fill.
+
+Ordinary CRM requests now bound headers and body processing at 120 seconds,
+respect earlier cancellation and expose `request_timeout` for stalled requests.
+The existing local bootstrap deadline remains terminal. No write is retried
+automatically; uncertain saves retain drafts, and uncertain transfer or Google
+requests require a state check before another write. A staged import whose
+upload fails retains the known transfer and file selection rather than
+restarting its creation chain.
+
+Executed with Node 24: **33 frontend unit tests passed**. The new isolated
+`tests/action-feedback.browser.mjs` held responses open and passed immediate
+SDK feedback, repeated-click exclusion, slow notices, clipboard failure/recovery,
+timeout/read-back recovery, confirmation persistence, partial staging failure,
+Google review-draft retention and distinct transfer actions. The SDK default
+coarse/fine matrix passed in light/dark with real touch contexts and reduced
+motion. Existing Prompt, Note, Prompter and bootstrap browser suites also passed.
+The bootstrap fixture's old `New prompt` heading was aligned with the existing
+`New agent prompt` label. All browser APIs were isolated fixtures or a disposable
+loopback backend with external requests blocked; these checks do not verify
+hosted permissions or persistence.
+
+Frontend app and packaged user-guide builds, documentation validation, the closed
+theme audit and whitespace checks passed. User and maintainer guidance were
+updated in the frontend; no CRM API route or database schema changed for this
+feedback work. No push or deployment was performed.
+
+### Authorized deployment stopped at the mandatory agent gate (2026-10-16)
+
+The user authorized deployment through the existing CRM workflow. Preflight
+resolved this checkout's `main` branch and commit `86707f3` to its registered
+branch; SDK `9.0.27` matches the requirements. The push remote is the normal
+GitHub SSH URL, with no disabled push URL. Installed the existing required
+`.githooks` path in local Git configuration; no hook was removed or bypassed.
+
+Executed `.venv/bin/python scripts/erp/crm/agent/verify_local_agent.py` with the normal trusted
+local CA bundle. The actual local Tau `2.0.13` runtime initialized with the
+workflow's `openai-codex/gpt-5.6-luna`, thinking `medium`. Its protected CRM
+bootstrap then returned `503 CRM_NOT_READY`, correlation
+`9339416a-1ae7-4350-9510-df0165af6b6f`, explicitly naming missing binding
+`mainsequence_crm__prompt`. The script exited `1` before starting a model turn
+or obtaining a successful MCP result; provider readiness alone is not a live
+agent pass. Its owned processes shut down normally.
+
+Failed-run evidence remains under ignored
+`.local/agent-pre-push/8a6f7bdf-da59-4747-9cb0-11e85dfc41f7/` (`report.json`,
+`crm.log` and `agent.log`). The current gate's use of the unmigrated hosted
+catalog blocks the push that would trigger the migration Job. No commit,
+push, hosted migration or deployment was performed. Resolving this needs a
+verification-environment or explicit gate-policy decision, not a manual hosted
+migration or an unapproved bypass. Other projects were not changed.
+
+### MetaTables 0.1.39 update and actual CRM stack restart (2026-10-15)
+
+Updated `mainsequence-metatable` from `0.1.38` to the newly published,
+non-yanked `0.1.39` through CodeRepository dependency sync. The dependency
+floor, lockfile, exported requirements and installed environment agree.
+Main Sequence remains `9.0.27` and Tau remains `2.0.13`; no other dependency
+version changed. Refreshed only the five MetaTables-owned skills using its
+package copier after a dry run. Separate SDK guidance was not refreshed.
+No business implementation or tests were changed for this update.
+
+Executed the full suite: **342 passed**, with the existing 37 deprecation
+warnings. The SDK compatibility check, repository-wide Ruff, documentation
+route check, strict MkDocs and `git diff --check` passed.
+
+Stopped the verified CRM launcher and reran the normal frontend
+`scripts/dev-stack.mjs` with Node 24, using the API's updated Python environment.
+The saved-session refresh succeeded. API health, local Tau health/readiness,
+guide, Vite, and Vite's Tau/guide/platform proxies passed. All four services
+remained running after the failed bootstrap; this is not the stale-process
+check recorded for `0.1.38` below.
+
+The real browser at `http://127.0.0.1:38644/contacts` still shows the startup
+error gate, not a ready Contacts list. A serialized bootstrap through Vite
+returned `503 CRM_NOT_READY` in 4.52 seconds, correlation
+`4682345a-e25b-4141-a143-e45d516f1256`, explicitly naming missing active binding
+`mainsequence_crm__prompt`; catalog-dependent checks remained pending.
+A fresh `0.1.39` metadata request independently confirmed 26 of 27 expected
+active CRM bindings, all at revision `0009`, with only that binding absent.
+The previous caller-assertion `401` did not recur. Directly requesting a
+25-contact page returned `500`; the actual API traceback ends in the same
+CRM `CatalogValidationError` from the incomplete registry, before governed
+contact SQL executes. This is an additional unhandled-error response path,
+not a successful list read or another authentication refusal.
+
+CRM revision `0010` authors the Prompt table; the normal `migrate-crm`
+deployment Job must apply/finalize the application's pending revisions before
+this checkout can become ready against that hosted catalog. Updating the client
+does not run that Job. No hosted migrations, business data writes, commit,
+push, deployment or other-project changes were performed. Browser conformance
+was limited to the actual startup/error gate; ready-state layout, contact data
+access and persistence remain unverified while the catalog is incomplete.
+
+### MetaTables 0.1.38 and identity-only SDK compatibility (2026-10-15)
+
+Updated the installed `0.1.37` client to the non-yanked
+[MetaTables 0.1.38 release](https://pypi.org/project/mainsequence-metatable/0.1.38/).
+It requires Main Sequence SDK `>=9.0.27,<10`; the dependency floors, lockfile,
+exported requirements and installed environment now select `0.1.38` and
+`9.0.27`. The supported CodeRepository sync updated only these two dependency
+versions. Tau remains `2.0.13`. The package's copier refreshed its five owned
+skills and reference snapshots after a dry run. The separate Main Sequence
+skill copy remains `9.0.23`, intentionally not refreshed without that request;
+version-matched SDK guidance was read from the installed `9.0.27` bundle.
+
+The initial compatibility run exposed the removed legacy signed Team-list
+contract. CRM's hosted policy now uses the effective person's public
+`in_teams(..., max_age_seconds=0)` lookup instead of `identity.team_uids`.
+Existing reader/writer/admin capability sets and requester-only delegation
+remain unchanged. Signed test fixtures now use identity-only proofs; explicit
+legacy caller and requester Team claims are still tested as rejected. Scoped
+policy checks exercise the actual SDK helper while replacing only its platform
+membership fetch. They cover revocation within one request and unavailable
+membership lookup returning `503` without a business write or workload fallback.
+These controlled checks do not prove a deployed membership endpoint.
+
+Executed the complete suite: **342 passed**. Repository-wide Ruff,
+`python -m metatables.sdk_compat`, strict MkDocs and `git diff --check` passed.
+Existing FastAPI lifespan and Starlette/AnyIO deprecation warnings remain;
+there is no longer a legacy `team_uids` accessor warning from the CRM policy.
+The suite's isolated database fixtures are not hosted business writes.
+
+A fresh read-only catalog request returned `200`, with 26 of the expected 27
+active bindings, revision `0009`, and only `mainsequence_crm__prompt` missing.
+The earlier catalog caller-assertion `401` was not reproduced. A separate fresh
+process exercised the actual local launcher through its serialized ASGI
+interface with the saved SDK sign-in and no replaced identity or catalog
+ports: health returned `200`; bootstrap returned `503 CRM_NOT_READY` after
+14.01 seconds with the explicit missing-Prompt diagnostic and correlation
+`4076ac2d-f874-462f-829e-2e0f7bdab66e`. Catalog-dependent checks remained pending.
+This proves the updated launcher's diagnosis, not a ready CRM UI, physical
+schema verification or successful business data access. Existing long-running
+development processes were not restarted by this check.
+
+Hosted revisions must still run through the normal `migrate-crm` deployment
+Job. No hosted migration, other-project change, commit, push or deployment was
+performed for this update. The real-provider agent check remains mandatory
+before any push.
+
+### Local sign-in classification and upstream caller-assertion trace (2026-10-15)
+
+Traced two separate failures. The local runner previously caught every SDK
+sign-in exception and returned `401`, even when a control-plane connection reset
+had not judged credentials. `api/erp/crm/local.py` now reserves `401` for explicit
+SDK authentication refusal or an absent Bearer credential, preserves a forbidden
+lookup as `403`, and returns `503 LOCAL_SIGN_IN_UNAVAILABLE` for transport,
+backend and otherwise unclassified verification failures. Timeouts keep their
+specific `503` code. Failures log their user/token phase, safe exception type
+and upstream status with the same UUID returned in the existing error envelope.
+Loopback restrictions, caller-header rejection, per-request SDK verification,
+policy binding and fail-closed behavior are unchanged.
+
+Executed the complete suite: **338 passed**. Eight serialized HTTP cases cover
+connection, SDK transport, backend-503 and unknown exceptions in both preliminary
+sign-in phases, with correlation and secret redaction. The invalid-credentials
+fixture now raises the SDK's actual authentication exception, not an ambiguous
+RuntimeError. Focused identity/readiness checks, repository-wide Ruff, strict
+MkDocs and `git diff --check` passed. These controlled cases do not claim that
+an actual platform outage was induced.
+
+The independent live catalog 401 is reported as
+[MetaTables #69](https://github.com/mainsequence-projects/MetaTables/issues/69).
+At `2026-10-15T20:30:26Z`, request
+`33ac968405c3167970bb43381f727841` was rejected inside `fapi_runtime` before
+route matching in 1.532 ms; the gateway forwarded the same 401. The same saved
+SDK sign-in successfully read the platform user. Owner-log revision context
+identified active MetaTables commit `c3cd9f0d15e410e4d537b517230a1ff6930ea48e`,
+whose requirements pin SDK `9.0.19`; its active revision remained older than
+its desired revision. A synthetic Ed25519 proof without `team_uids` was rejected
+by the official `9.0.19` verifier with a missing-claim cause and accepted by the
+installed `9.0.26` verifier. Both accepted the legacy fixture. This establishes
+a code-level compatibility risk, not inspection of the live proof: the actual
+runtime log does not expose its precise verifier sub-branch. The issue records
+that uncertainty and asks the owning project to verify its active deployment.
+
+No other project's source or deployment was changed. No hosted migration or
+business write was performed, and no commit or push is claimed for this fix.
+
+### MetaTables 0.1.37 dependency update (2026-10-15)
+
+Updated the existing local `0.1.36` installation to the newly published,
+non-yanked [MetaTables 0.1.37 release](https://pypi.org/project/mainsequence-metatable/0.1.37/).
+Its package metadata requires `mainsequence[mcp]>=9.0.26,<10`; the supported
+`mainsequence code-repository sync --path .` therefore updated the SDK from
+`9.0.23` to `9.0.26` too. Only those two dependency versions changed. The
+dependency floor, lockfile, exported requirements and installed environment
+agree; Tau remains `2.0.13`.
+
+The package's copier refreshed its five MetaTables-owned skills and reference
+snapshots after a dry run. Its sentinel now reports `0.1.37`. The separate
+Main Sequence skill copy still reports `9.0.23`; that namespace and `AGENTS.md`
+were not refreshed because no separate skill/instruction update was requested.
+Version-matched maintenance guidance was read from the installed SDK bundle.
+
+Executed checks: the complete existing test suite passed (**330 tests**),
+`python -m metatables.sdk_compat` passed against SDK `9.0.26`, repository-wide
+Ruff passed, strict MkDocs passed and `git diff --check` passed. Existing
+deprecation warnings remain, including the SDK's warning on the legacy
+`RequestUserIdentity.team_uids` accessor. No business implementation or tests
+were added or changed for this dependency update.
+
+Two fresh read-only catalog attempts stopped before contacting MetaTables:
+the configured control-plane endpoint reset the connection to
+`/api/v1/code-repository-branches/resolve-git-context/`, producing
+`CodeRepositoryContextError`. This does not establish whether the earlier
+runtime caller-assertion 401 is fixed or still present. No database migrations,
+push, deployment or other project changes were performed. The real-agent
+pre-push check remains required before publishing.
+
+### MetaTables 0.1.36 upgrade before prompter delivery (2026-10-15)
+
+Upgraded `mainsequence-metatable` from `0.1.35` to the latest non-yanked PyPI
+release, `0.1.36`, verified from its package metadata on this date. The dependency
+floor, `uv.lock`, exported `requirements.txt` and installed `.venv` agree. The
+Main Sequence SDK remains `9.0.23`. The supported CodeRepository sync command
+performed the lock, environment sync and runtime export; after explicit approval,
+the package's copier refreshed its five owned skills and reference snapshots.
+
+Executed `.venv/bin/python -m pytest -q`: **330 passed** on `0.1.36`. The focused
+migration/prompter/catalog selection also passed (**33 tests**), covering the
+disposable PostgreSQL write lifecycle and SQLite upgrade/downgrade with a fresh
+interpreter read. Revision `0011` retains its SQLite additive DDL because the
+installed batch implementation still does not preserve the old unnamed checks
+when recreating the table. No applied revision was rewritten.
+
+The existing `migrate-crm` Job already calls the public `upgrade_application`
+path and gates API deployment; the assistant waits for the API. The client
+upgrade does not establish that the shared MetaTables API has been upgraded.
+Hosted schema execution, live catalog verification and deployment remain
+unverified, and no push was performed.
+
+### Optional prompter subject and independent draft constraints (2026-10-15)
+
+Implemented in the API working tree based on `067b8f3` and the paired frontend
+working tree based on `dcd5502`. Prompters retain their open `kind` and existing
+body `template`, with optional `subject_template` and a typed `constraints`
+object. Both render and read-only edited-draft validation return independent
+counts, limits and violations; business overflow preserves the complete draft.
+API/MCP contracts, both copies of the CRM usage pack and the served user guide
+were updated together.
+
+Executed checks:
+
+- `.venv/bin/python -m pytest -q`: **330 passed**. Prompter coverage includes
+  strict limit payloads, Unicode boundaries, legacy defaults, optional subjects,
+  strict Jinja behavior, REST/MCP parity, read authorization and current saved
+  constraints. Actual compiled atomic CRM statements ran against the test's
+  private disposable PostgreSQL cluster, including create/update/read-back,
+  stale versions, injected audit failure/rollback and fixture cleanup. The
+  MetaTables transport and identity ports were mocked; this is not evidence
+  of platform-enforced table permissions. Temporary SQLite migration tests
+  upgraded legacy records through `0011`, preserved existing checks, reopened
+  persisted values with the authored model in a fresh interpreter and verified
+  downgrade behavior.
+- Targeted Ruff checks and `git diff --check` passed. Strict MkDocs and mounted
+  route documentation checks passed.
+- With Node 24, frontend `npm test`: **23 passed**; `npm run docs:check`, the
+  combined app/user-guide build and the closed SDK theme audit passed.
+- `node tests/prompters.browser.mjs` used an owned Vite process and isolated
+  in-memory API fixtures, with external requests blocked. It verified subject
+  creation/removal, independent limits, unchanged legacy records, full overlong
+  previews, Unicode counts, current-rule revalidation, failure retention and
+  preservation of edits during delayed responses. The SDK default coarse/fine
+  matrix used real touch/mobile contexts and light/dark presets; computed form
+  and preview control colors matched the applied theme tokens. Invalid fields
+  expose `aria-invalid` and validation feedback uses a live status region.
+- `node tests/docs-artifact.browser.mjs` served only `dist/` on an owned loopback
+  port and passed application/help entry points, every generated guide route,
+  nested links and mobile/desktop light/dark checks.
+
+Live boundaries: the read-only local MetaTables runtime check reported SQLite
+Local mode but no active CRM catalog bindings. A fresh client therefore failed
+`CatalogRegistry.validate()` with an incomplete-catalog diagnostic; live catalog
+binding and platform authorization remain unverified. The shared local database
+was not initialized or migrated. Revision `0011` has not been applied to hosted
+data; the normal `migrate-crm` deployment Job must apply it before release. No
+push or deployment was performed, and the real-provider agent pre-push gate was
+not run for this unpushed change.
+
+### CRM-owned readiness diagnostics and gateway escalation (2026-10-15)
+
+This fix is local to the API working tree based on `067b8f3`. It changes
+`api/erp/crm/main.py`, `src/erp/crm/platform/{catalog,runtime,readiness_errors}.py`,
+their focused tests and the API/delivery documentation. Other in-flight
+Solution Selling changes in the shared checkout were preserved, not edited by
+this readiness fix. No frontend or infrastructure source was changed in this
+scope.
+
+Readiness now reports a safe upstream HTTP status, recognized gateway code and
+validated UUID correlation, rather than swallowing the catalog exception.
+Missing expected CRM catalog bindings name the identifiers and direct hosted
+operators to the existing migration Job. A connected settings/bootstrap adapter
+blocked by catalog failure is pending; a missing adapter remains failed.
+Structured `crm.readiness_check_failed` logs retain correlation without raw
+SDK exception strings, headers, bodies, URLs or tracebacks. Identity, fresh
+capability evaluation, fail-closed readiness and response shapes are unchanged.
+
+Actual checks:
+
+- `.venv/bin/pytest tests/erp/crm/integration/test_readiness_errors.py tests/erp/crm/integration/test_catalog.py
+  tests/erp/crm/integration/test_contracts.py tests/erp/crm/integration/test_bootstrap_responsiveness.py
+  tests/erp/crm/integration/test_bootstrap_runtime.py tests/erp/crm/integration/test_local_auth.py
+  tests/erp/crm/integration/test_request_identity.py -q`: **72 passed**. The new failure cases use
+  actual SDK exception objects and serialized HTTP through the installed
+  caller-assertion verifier, with fixture signing keys and controlled runtime
+  ports. External HTTP is forbidden in the new tests. They prove gateway error
+  correlation/redaction, actionable missing-Prompt diagnostics, blocked-stage
+  truth, continued fresh policy checks and final bootstrap error handling.
+- `.venv/bin/pytest -q --tb=short`: **325 passed, 5 failed** in a shared working
+  tree being changed concurrently. The failures were the in-flight Prompter
+  validate route's documentation parity, three MCP catalogue-count expectations
+  after a new tool, and a disposable Prompter audit-constraint fixture. No
+  readiness-related case failed on that run. This is not a green full-suite
+  claim or a review of that separate feature's changes.
+- Repository-wide Ruff, strict MkDocs and `git diff --check` pass for the
+  checked working-tree state. Documentation route parity is a separate check
+  and was not green on the full-suite run above. A later separate
+  `.venv/bin/pytest tests/erp/crm/documentation/test_documentation.py -q` passed (**1 test**) after
+  the concurrent route-index update; this readiness fix did not edit that index.
+
+The external gateway defect is reported as
+[infrastructure #90](https://github.com/Main-Sequence-Server-Side/infrastructure/issues/90),
+with read-only live evidence and a separate isolated NGINX reproduction. No
+external project was patched or redeployed. The earlier read-only metadata
+check reported CRM catalog revision `0009` and no active core Prompt binding;
+that is catalog evidence, not physical-schema inspection. Revision `0010` is
+already authored here; hosted migration/finalization still belongs to the
+candidate image's `migrate-crm` Job, not a developer-side hosted command.
+
+On re-verification later on 2026-10-15, fresh runtime access reached the active
+MetaTables revision `91a78391-86df-4bb9-b348-aabba600a1b7`, but both the
+one-table and full 27-table catalog requests returned **401**, with
+`Invalid or missing caller assertion.` The earlier 503 was not reproduced;
+the dependency is nevertheless not ready for CRM. The full-query request ID
+was `2536d7d9ccf1abdc12abfb7c12559df2`.
+Owner-scoped logs for that request place the 401 in `fapi_runtime`, with a
+1.491 ms rejected request; the gateway forwarded the same 401. This is a
+runtime caller-assertion rejection, not evidence that the original gateway
+buffer failure persists. The exact assertion-verification cause is unproven.
+
+Executed `.venv/bin/python scripts/erp/crm/agent/verify_local_agent.py` with the workflow's
+real `openai-codex/gpt-5.6-luna`, medium thinking and Tau `2.0.13`. Local
+authentication, provider control and storage became ready, but protected CRM
+bootstrap returned **503** because catalog access returned **401**. CRM policy
+and directory connections were ready; settings, bootstrap and authorization
+were correctly pending. The business tool turn and restart/read-back assertions
+were therefore not reached. Sanitized report and local logs are retained under
+ignored `.local/agent-pre-push/e86ad48c-8be8-41f5-ba17-84aed400a5dd/`.
+
+The 72 focused tests and the documentation parity test passed again; focused
+Ruff, strict MkDocs and `git diff --check` passed. No hosted data/schema change,
+migration or deployment was performed. Publishing remains blocked by the
+repository's required live pre-push check; do not bypass it. The normal
+deployment workflow's `migrate-crm` Job is still required for hosted `0010`.
+
+### Non-fatal local bootstrap failures (2026-10-15)
+
+Implemented in the paired frontend working tree based on `dcd5502`; API
+documentation is based on `067b8f3`. These are uncommitted local changes, not a
+deployment. No API route, identity, permission, database or SDK dependency was
+changed.
+
+The CRM-owned `scripts/dev-stack.mjs` previously threw on a failed or timed-out
+bootstrap, reaching its outer `stop(1)` handler and terminating its children.
+It now uses `scripts/bootstrap-probe.mjs` to return a non-ready diagnostic,
+prints the frontend URL before probing and keeps the services running. Failed
+prerequisites and actual child-process crashes remain fatal. The frontend and
+launcher share public error/readiness extraction in `src/api-error.ts`.
+`src/App.tsx` preserves the startup gate and Retry action; it does not claim
+that the backend is reachable when no complete response arrives.
+
+Actual checks, all exiting successfully:
+
+- Frontend `npm test`: **22 passed**, including bootstrap HTTP failures,
+  actual elapsed deadlines before headers and during the body, malformed
+  responses, network failure and subsequent successful probing.
+- `node tests/bootstrap.browser.mjs`: real Vite proxy, disposable loopback HTTP
+  backend and Chromium. HTTP `503` preserves `CRM_NOT_READY` and the failed
+  catalog check; the startup shell is checked at 375, 768 and 1280 pixels in
+  light/dark presets, with real coarse/fine pointer contexts. Keyboard Retry
+  reaches the ready shell and public SDK page-layout assertions pass. Vite
+  stays available after a real elapsed probe timeout. Browser deadlines are
+  shortened in test code only to exercise stalls before headers and during
+  an error response body. Screenshots were inspected locally.
+- `node tests/prompts.browser.mjs`: existing isolated Prompt UI checks pass
+  with **31** fixture requests, including stale-version and uncertain-response
+  recovery. `node tests/docs-artifact.browser.mjs` verifies the built app,
+  help home and all **21** generated guide links on an owned static server.
+- `npm run docs:check`: **22** pages; `npm run build`: app typecheck, Vite
+  artifact and Docusaurus guide pass. Existing large-chunk and Docusaurus
+  update-check warnings remain non-fatal. The public SDK theme audit passes
+  for all **3** authored CSS files.
+- API documentation route parity: **1 passed**; strict MkDocs and both
+  repositories' `git diff --check` pass.
+
+The local transport uses native same-origin fetch, not the SDK's hosted
+delegated transport. The installed SDK's `ApplicationStatusScreen` renders the
+supplied message unchanged, and the browser shows the complete public backend
+error. No Command Center SDK defect was established, so no SDK issue was opened.
+These checks do not run the full authenticated four-process launcher, refresh
+the developer sign-in, contact production, test live provider inference or
+verify a hosted session. No push or deployment was performed; the real-provider
+Tau pre-push gate remains required before publishing API changes.
+
+### Core fixed-Markdown Prompts (2026-10-13)
+
+Implemented locally in the uncommitted API working tree based on `d825f53`
+and the paired frontend working tree based on `90fadc8`. Existing unrelated
+working-tree changes were retained. These results describe that local source,
+not the deployed revisions bearing those base commits.
+
+The change adds the Prompt contract, MetaTable and additive revision `0010`,
+resource registry/projections and seven REST routes, plus the frontend's
+`src/erp/crm/prompts/` screens, navigation, Markdown editor dependencies and user guide.
+The shared resource reader now permits a metadata-only collection contract;
+Prompt collections never select `content_markdown`. Lists request 50 records.
+This core feature is independent of optional Solution Selling Prompters and
+adds no assistant MCP tools.
+
+Actual checks, all exiting successfully:
+
+- `.venv/bin/pytest -q`: **307 passed**. Prompt HTTP tests execute actual CRM
+  compiled SQL in a disposable private PostgreSQL cluster. They cover
+  create/edit/read/archive/restore, exact literal Markdown, strict input,
+  version conflicts, per-operation capability revocation, archived edits,
+  metadata-only pagination, canonical SDK discovery/collection schemas and
+  indexed valid/invalid fixtures. A failed audit constraint rolls back the
+  document update; an actual PostgreSQL Reader role cannot write. Identity
+  and policy facts are controlled fixtures, and external HTTP is forbidden in
+  Prompt tests. SQLite migration tests apply the full history to `0010`, check
+  the UTF-8 limit, reopen persistence and downgrade only the Prompt table.
+- `.venv/bin/python scripts/erp/crm/verify_prompts_local.py`: a private loopback
+  MetaTables API with a temporary SQLite database applies revision `0010`,
+  executes governed compiled insert/update operations, and confirms version 2
+  and exact content from a **fresh client process**. That process binds all
+  **27** CRM tables and validates settings. Only developer identity/Team facts
+  are fixtures; the API, migration, catalogue and persistence are real.
+  External/platform HTTP is blocked. The owned Prompt is deleted after its
+  current state is confirmed, and the temporary runtime is disposed. This is
+  not an API-restart or real-provider Tau test.
+- Frontend `npm test`: **16 passed**. `npm run docs:check` validates all **22**
+  guide pages. `npm run build` type-checks and builds both the app and guide in
+  `dist/`. `npx --no-install command-center-sdk theme audit --path src` passes
+  for all three authored CSS files. Node 24 is used. The editor is lazy-loaded;
+  Vite still reports a non-failing large-chunk warning, including the editor
+  chunk (approximately 199 KiB gzip).
+- `node tests/prompts.browser.mjs` uses real Chromium against an owned Vite
+  process with every CRM HTTP request intercepted by disposable in-memory
+  data. Both fallback API/guide proxies point to an unreachable port; external
+  browser requests are blocked. Actual UI checks cover formatted toolbar
+  edits, exact source-mode switching/copying, unsupported-content preservation,
+  archive/restore, unsaved cancel/back protection, stale-version recovery,
+  committed-but-lost responses without replay, safe HTML/link/image handling,
+  the Prompt help action, dense lists with long labels, reduced motion and
+  list-error refresh recovery. Public SDK shell/layout assertions pass at 375
+  and 768 pixels with actual touch/mobile contexts, and at 1280 pixels with a
+  fine pointer, in light and dark presets. Screenshots are inspected locally.
+- `node tests/docs-artifact.browser.mjs` serves only the built `dist/` on an
+  owned random loopback port. The application reaches its required-host gate,
+  `/docs/` and all **21** generated feature links resolve, the Prompt deep link
+  loads on desktop/mobile in light/dark, and the return link opens the app.
+  No guide asset fails. This is packaged static-artifact verification, not a
+  live Command Center transport/session check.
+- Focused Ruff, strict MkDocs and both repositories' `git diff --check` pass.
+
+No production data, normal developer DataSource, hosted migration, deployment,
+push or release was used for these checks. Hosted identity/policy and
+startup/reconnection behavior are unchanged and not newly live-verified. The
+real-provider Tau pre-push gate remains required before publishing; it was not
+run for this unpushed implementation. A normal authorized release must apply
+`0010` through the existing `migrate-crm` Job before serving these routes.
+
+### Implementation maintenance sources (2026-10-13)
+
+API maintenance starts from `AGENTS.md`, the project development skills,
+`src/erp/crm/`, mounted `api/erp/crm/` behavior, tests and these MkDocs pages. Frontend
+maintenance starts from its `AGENTS.md`, `engineering/README.md`, current
+Vite source, tests and end-user guide. Installed package contracts and
+version-matched skills govern SDK behavior in the checkout that installs them.
+
+The initial specification pack, duplicate development-skill source tree,
+installation scripts, offline pack validators and their frontend Python
+dependencies have been removed. The Atomic MIT notice is retained under the
+frontend's `engineering/legal/`. The two project development packs now share
+the current API rules for singleton settings, direct record foreign keys,
+version fences, uncertain-write recovery, migration Jobs and application MCP.
+
+This maintenance change alters instructions, documentation and obsolete
+validation tooling. It does not change CRM runtime behavior or establish new
+live verification. Existing dated deployment evidence and unresolved checks
+below retain their original scope.
+
+### Company and prompter prospecting prerequisites (2026-10-13)
+
+The local `crm-prospecting` skill now resolves the actual Company before any
+prospecting Contact creation. A missing Company is created from established
+facts first; the Contact create includes its confirmed `company_uid`. Unknown,
+ambiguous or unresolved Company state blocks Contact creation. CRM core routes
+prospecting Contact saves through this prerequisite. The API contract remains
+unchanged; this is skill guidance rather than a new database constraint.
+
+The workflow then covers Contact resolution, required
+prompter selection or creation, requested Lead preparation, rendering, actual
+outreach evidence, requested Interaction recording, Lead progress and follow-up
+Task linking. If no prompter is indicated, the workflow creates one before
+drafting. Introductions, follow-ups and conversation preparation use a saved
+prompter. Historical logging and research-only requests preserve their own
+scope; neither implies that a new template was used in past outreach.
+
+Prompter and shared write guidance use the same rule. All eight usage-pack files
+match between API and static repositories; the five-skill allocation and 69-tool
+catalogue are unchanged. All five skills pass the skill validator. The skill
+pack, protected MCP publication and documentation tests pass (11 tests), and
+the strict MkDocs build passes. These are offline checks, not a live agent
+execution of the new workflow.
+
+The workflow changes are local and unpushed. No CRM business records, API
+contracts, Tau source or configuration changed. Hosted agent skill access still
+has the SDK gap recorded below; this skill update does not resolve it.
+
+### Deployed MCP and agent render verification (2026-10-13)
+
+The deployed API and assistant run API commit `d825f53`; the deployed static
+site runs `90fadc8`. Authenticated requests to the deployed `/mcp` passed
+`skills/list`, `skills/get` for all five manifests, and `resources/read` for all
+eight advertised files. Every file matched the source bytes and SHA-256 digest.
+
+The deployed CRM assistant was then exercised through its advertised normal
+`POST /api/chat` route using the real `openai-codex/gpt-5.6-luna` configuration.
+Its actual tool results show discovery of 69 business tools and successful
+Contact, Company and prompter reads, affiliation verification, and an unsaved
+`crm_prompters_render` call. The selected existing Contact was Javier Eduardo
+Bernal Stoopen at Monex. The stored `test` prompter returned exactly
+`Hi  Javier Eduardo`, matching the direct MCP result. The successful tool
+results and final answer were confirmed in persisted session entries.
+
+Remote skill consumption by the deployed assistant remains unavailable.
+Tau 2.0.13's application bridge exposes only application tool listing/calling,
+discarding the connection's advertised resource catalogue and exposing no
+skill/resource reader. Its local project skill read does not establish a remote
+MCP skill read. SDK issue
+[#98](https://github.com/mainsequence-sdk/ms-tau-sdk/issues/98) records the live
+reproduction and source evidence. The MCP publisher itself passed.
+
+Evidence is retained under ignored `.local/deployment/agent-skill-render/`.
+These checks changed no CRM business records or Tau source/configuration.
+
+### Publication gates (2026-10-12)
+
+The user authorized publishing the API and static `main` branches after the
+local MCP publication check. The static preflight passes its ten tests,
+TypeScript/Vite application build, same-artifact Docusaurus build, documentation
+validation, Command Center SDK theme audit and offline specification validation. The
+API's strict MkDocs build passes again.
+
+The API pre-push hook must execute `scripts/erp/crm/agent/verify_local_agent.py --pre-push`
+with the workflow's real provider/model before Git sends the commit. Its
+isolated processes leave the existing development stack running. A successful
+push must then be followed through deployment to the active API revision.
+Hosted verification must enumerate all five skill manifests and read all eight
+files from the authenticated `/mcp`, comparing bytes and SHA-256 digests with
+the pushed pack. Gate and deployment evidence stays under ignored
+`.local/agent-pre-push/` and `.local/deployment/`; local checks alone do not
+establish hosted availability.
+
+### CRM MCP skill publication (2026-10-12)
+
+The CRM now publishes `.agents/skills/domains/crm/usage/` directly using the
+Main Sequence SDK's `skills_extension` and `MCPServer`. The group is named
+`solution-selling`; shared guidance and allocation are stored once in
+`crm-core/references/`. All five skills and eight files are byte-identical
+between API and static repositories. Cross-skill links use served `skill://`
+resources. No generated publication pack is involved.
+
+The complete offline suite passes: 279 tests, including seven new publication
+cases. These check the actual CRM ASGI application with controlled local
+identity lookups and signed caller keys, all five skill manifests, eight exact
+file byte lengths/digests, every published link, enabled/disabled module
+catalogues, failed authentication, Origin admission and unpublished URI
+rejection. A modern official MCP client verifies the extension capability and
+reads a skill from the same endpoint, after changing the process working
+directory. Existing CRM tool authorization, redacted argument validation,
+caller isolation and REST/MCP parity checks pass after the transport change.
+
+An isolated fresh `api.erp.crm.local:app` process at `127.0.0.1:38645` also passed
+read-only HTTP checks using the real saved SDK sign-in: five list/get results,
+all eight files matching source bytes and manifest digests, and 69 advertised
+business tools. No business operation or Tau call was made. That verification
+API was stopped.
+
+The existing VS Code stack's API was subsequently restarted independently on
+port 38641. Its new process passed the same real-sign-in checks on
+`http://127.0.0.1:38641/mcp`: all five list/get results, all eight source files
+and manifest byte lengths/SHA-256 digests, and 69 advertised tools. The original
+supervisor continues to manage the replacement API. Tau's process ID stayed
+unchanged; no Tau call, restart or configuration change occurred. The temporary
+supervisor debugger was closed after the restart. Current endpoint and process
+evidence is in ignored `.local/mcp-skills/live-publication.json` and
+`.local/mcp-skills/api-restart.json`.
+
+Ruff, `git diff --check` and `mkdocs build --strict` pass.
+
+These checks establish local implementation behavior. At the time of these
+checks, hosted publication was unverified and the changes were uncommitted.
+The publisher and API restart changed no Tau source, configuration or runtime. See
+[MCP skill publication](../api/mcp.md#sdk-skill-publication).
+
+### Main Sequence 9.0.23, Tau 2.0.13 and MCP skill publication review (2026-10-12)
+
+The repository now requires `mainsequence[mcp]>=9.0.23`, pins `ms-tau-sdk==2.0.13`
+to tag `v2.0.13` (commit `fd8ad7b348e50c99f14cfef4a88bc1ac4b0f9e2d`), and uses
+MCP 2.3.0. The installed packages, lock and runtime export agree. Main Sequence
+and Tau managed development skills were refreshed to those exact versions;
+the project-owned CRM usage packs were preserved.
+
+MCP 2.x removed the old low-level decorators and implicit server request
+context. The CRM now registers callbacks and binds each callback's HTTP request
+only for that call, with context copied to its worker thread. The local bridge
+uses `httpx2`, the two-stream transport context and wire-alias serialization.
+Business validation, effective-person permission checks and uncertain-write
+recovery are unchanged. The complete offline test suite passes: 272 tests,
+including in-process MCP protocol, caller isolation and local bridge checks.
+Ruff and the strict documentation build pass. The Tau ASGI entrypoint imports
+with its SDK-installed local request identity.
+
+The initial publication review identified the SDK-supported Skills extension
+and the source pack's layout requirements.
+A temporary conforming five-skill pack passed `skills/list`, `skills/get`,
+all 16 resource size/digest checks, and modern capability discovery. Evidence
+is in ignored `.local/sdk-upgrade/mcp-skills-probe.json`. The source pack was
+not renamed or mounted during that review. Its root references folder and
+underscored group failed documented format rules; the conforming publisher
+showed no SDK defect and no upstream bug issue was needed. The subsequent
+publication change above fixes the source layout and mounts it directly.
+
+These are offline and in-process checks. A live provider/model assistant check,
+hosted deployment remain unverified. Nothing was committed or pushed.
+
+### CRM skill namespace separation (2026-10-12)
+
+The 11 API repository coding skills moved into
+`.agents/skills/domains/crm/development/`, preserving their names and
+supporting files. The frontend's development skills use the same namespace.
+Physical table namespaces remain unchanged.
+
+The `.agents/skills/domains/crm/usage/` pack now contains five business usage
+skills: core, Deals, prospecting, prompters and discovery. Core combines routine
+records, Notes, tags, activity, Tasks, Interactions, owners, settings and merge
+previews. The three Solution Selling skills are now nested in `solution-selling/`.
+They explain tool selection and workflow decisions; shared guidance covers
+permissions, pagination, version fences, results and uncertain-write recovery.
+Prompter guidance includes supported Jinja context and documents the absent
+requirements-discovery tool. Prepared diagnoses and rendered text remain drafts.
+See the [MCP usage pack](../api/mcp.md#crm-usage-skill-pack).
+
+`crm-core/references/tool-map.json` allocates all 69 current business tools exactly once:
+37 core, 9 Deals, 8 prospecting, 5 prompters and 10 discovery. The coverage tests
+compare this allocation with the actual catalogue, including the 46 tools
+remaining when Solution Selling is disabled. They also check concrete tool
+references, skill paths and links within the pack.
+
+Executed checks: all five skills pass the skill validator, all eight usage-pack
+files are byte-identical across repositories, and Ruff passes for the new test.
+`tests/erp/crm/agent/test_crm_skill_pack.py` plus `tests/erp/crm/documentation/test_documentation.py` pass (4 tests),
+and the strict MkDocs build passes. The earlier development namespace move
+preserved all 20 API and 18 frontend development files apart from namespace
+references and passed the then-current specification validator. These are offline file, catalogue
+and documentation checks; they do not invoke business operations.
+
+The namespace refactor authored skill guidance without changing the tool
+catalogue or executing CRM writes. The subsequent publisher change above
+exposes those files through the SDK. File and catalogue validation does not
+prove live agent behavior or deployed MCP availability. Changes stay local
+until the user authorizes a push.
+
+### Local prompter creation feedback and requirements review (2026-10-12)
+
+The static checkout now shows an immediate creation status, disables repeat
+submission, and explains longer waits without inventing server progress. The
+first detail view uses the full confirmed creation response rather than
+issuing a redundant detail read; leaving and reopening loads fresh server
+state. The application build and SDK theme audit pass. Browser checks with
+controlled delayed responses cover pending, duplicate prevention, error
+recovery, and successful navigation with no extra detail request. These are
+simulated response checks, not proof of a new persisted CRM mutation.
+
+Read-only requests to the running local API returned HTTP 200: the prompter
+collection took 6.109 seconds and an existing prompter detail took 5.318 seconds.
+Creation latency was not measured. Removing the redundant frontend request
+does not establish that the underlying governed operations are fast.
+
+Source and exposed tool schemas confirm the existing render endpoint and
+`crm_prompters_render`; there is no template-specific requirements discovery
+contract. See the [render contract](../api/solution-selling.md). The live
+read-only `crm_prompters_list` check returned `internal_error` with
+`CRM operation failed`; live rendering was not attempted and remains unverified.
+No requirements endpoint or tool was implemented, and these local changes
+have not been pushed.
+
+### Direct human MCP admission (pending live verification, 2026-10-12)
+
+Issue [#2](https://github.com/mainsequence-projects/MainSequenceCRMAPI/issues/2)
+identified that direct human OAuth authenticates successfully but carries no
+requester because it is not delegated work. The pre-fix API rejected such calls
+before capability evaluation. The source change admits an active direct human
+only after a caller-scoped directory lookup; it keeps unbound workloads denied,
+delegated calls requester-bound, and logs safe denial reasons.
+
+Local signed-assertion tests cover direct-human allow/deny, unbound-workload
+denial, delegated requester isolation and per-operation capability evaluation.
+They do not prove the deployed directory lookup or OAuth path. Before closing
+the issue, deploy the tested commit and execute a direct human `crm_contacts_list`
+call, one deliberately denied capability call, and an existing delegated
+read-only assistant call; inspect their correlated denial/success logs. Do not
+perform a hosted CRM mutation for this admission smoke test.
+
+### Solution Selling MCP read workflows (2026-10-12)
+
+Implemented `crm_prompters_render`, `crm_solution_selling_context_get` and
+`crm_diagnoses_prepare` in the API-owned catalogue, sharing the governed service
+with REST. The active catalogue contains 69 tools: 38 reads and 31 writes.
+All 205 tests, Ruff, strict MkDocs and mounted-route documentation parity pass.
+These are code/contract checks; they are separate from the live evidence below.
+
+Before committing, the real local Tau 2.0.12 agent ran with the workflow's
+`openai-codex/gpt-5.6-luna/medium` configuration and the normal CLI login.
+It loaded the project Solution Selling skill, discovered MCP schemas, and
+executed exactly the three new reads in order, each with successful business
+results. The context returned actual fixture Interaction history and source
+versions. Diagnosis preparation copied nine questions with null answers,
+labelled its business issue a hypothesis, and returned `saved: false`.
+After restarting both processes, public local history retained the same calls
+and every fresh REST result equalled its actual MCP result. Sanitized evidence
+is retained under ignored `.local/agent-pre-push/`.
+
+This is local agent/conversation verification against the configured hosted CRM
+dataset, not proof of local SQLite persistence for CRM records. The test used
+marked disposable records and a separate owned pipeline/stage; the agent calls
+were all read-only. Setup saved exact ownership, UIDs and versions for scoped
+cleanup. Fixture data and credentials are excluded from the commit.
+
+The push must pass the unchanged mandatory Contact smoke scenario on the
+committed revision. After push, verify the workflow's migration, API and
+assistant steps for that exact commit, and initialize the deployed MCP to
+confirm all 69 tools and the three new read-only schemas. Keep subsequent
+platform evidence separate from the local results above; neither bootstrap
+nor a Git push alone proves deployment or hosted business authorization.
+
+### Main Sequence 9.0.22, MetaTables 0.1.34 and Tau 2.0.12 (2026-10-11)
+
+The repository now requires `mainsequence[mcp]>=9.0.22` and
+`mainsequence-metatable>=0.1.34`, and pins `ms-tau-sdk==2.0.12` to its release
+tag `v2.0.12`, commit `f3cb704a7a5ab5b722782bdc7c016dd352f16852`. `uv lock`
+moved only those three packages; the local environment and the deployment
+`requirements.txt` export match. The managed skill copies were refreshed from
+the installed packages: Main Sequence 9.0.6 to 9.0.22, MetaTables 0.1.33 to
+0.1.34 and Tau 2.0.9 to 2.0.12. No CRM code, migration, workflow declaration
+or resource key changed; [ADR 0005](../crm_core/adrs/0005-crm-application-mcp.md)
+records the new direct-Message limit.
+
+Executed checks: all 201 tests, Ruff, strict MkDocs and the documentation test
+pass. The unchanged workflow passes live backend validation of the committed
+file with `valid: true`, API 2.3.0, no errors or warnings and
+`applicable: null`. Its three resource keys are unchanged from `origin/main`.
+
+The required local agent check passed on commit
+`13c214b728f3a85b0cad599abaaee7e7b43539bb` with a clean tree, Tau 2.0.12 and
+`openai-codex/gpt-5.6-luna/medium`. Protected bootstrap returned HTTP 200 with
+all six checks ready. The real turn called `crm__list_tools`, then one
+`crm__call_tool` running `crm_contacts_list` for a unique marker, which
+returned no items. After both processes restarted, the local history was
+unchanged and a fresh REST read matched the MCP result. The check's stream
+client disconnected at its 5-second read limit after about 13 seconds; it
+recovered the same persisted turn from local history without sending again.
+This supersedes the blocked status recorded below for this gate.
+
+The earlier catalog failure is gone because of an access change made outside
+this repository. Read-only inspection at about 21:00 UTC shows the developer
+reaching the CRM tables as a member of the owning Team
+`mainsequence-crm-production`, which makes the developer's effective access
+Writer rather than the Reader grant this gate documents. The Team also lists
+the API and migration Job workload Users recorded below and a service account,
+`ae0690b5-a8e9-4996-ad90-d1c40daf1dec`, that this documentation does not
+record. The namespace's only grant is still Writer to that Team. This update
+changed no grant or membership. The hosted deployment of these versions and its
+MCP verification remain to be done after the push.
+
+### Mandatory local agent pre-push check (2026-10-11)
+
+The user requires a real local-mode agent test before every push. The
+repository now provides `scripts/erp/crm/agent/verify_local_agent.py` and the executable
+`.githooks/pre-push` gate, installed per checkout with
+`git config --local core.hooksPath .githooks`. The live check uses the workflow's
+real provider/model, the project prompt and local CRM MCP bridge, verifies an
+actual governed read, then restarts Tau and the CRM API to check persisted
+local history and independent read-back. CRM calls are read-only; hosted
+storage and credentials are not replaced by mocks. See the
+[local check procedure](local-development.md#required-live-check-before-every-push).
+
+The first executed 2.0.11 local run failed during startup with
+`Main Sequence JWT refresh failed`. Tau was reading legacy access/refresh
+entries from `.env` rather than the current saved CLI sign-in. No chat turn
+or CRM tool ran, and nothing was pushed. The supported CLI `refresh-token`
+removed those legacy entries and renewed the saved session without printing
+credential values.
+
+The next real local turn used Tau 2.0.11 and
+`openai-codex/gpt-5.6-luna/medium`, discovered CRM MCP, then called
+`crm_contacts_get` once for the existing owned verification record. Its bridge
+returned `outcome_unknown` after 60 seconds. The completed public local history
+was recovered after restarting Tau; it proves the call failed the verification
+gate, even though the turn itself completed. No write or retry was sent.
+
+The protected bootstrap preflight then returned HTTP 503 `CRM_NOT_READY` with
+an unavailable catalog. Read-only diagnostics verified the intended Production
+Environment and the same human UID used by the hosted MCP test. Both the current
+GET filter and supported body filter returned zero of the 26 required CRM
+tables. The namespace's only grant is Writer to the approved API/migration
+workload Team; the human has no table-read contribution. Adding Reader for the
+developer requires a separate access decision. This local failure is therefore
+an access prerequisite, not evidence of another SDK defect. A passing end-to-end
+local run and fresh read-back remain unverified; no changes from this gate task
+have been pushed.
+
+All 27 focused Tau, MCP, local-auth and documentation tests passed; Ruff and
+strict MkDocs also passed. The installed hook rejected an uncommitted checkout,
+and the gate correctly rejected the recovered real `outcome_unknown` result.
+These checks do not substitute for the still-blocked live end-to-end check.
+
+After the user reported the Django repair, another local run at approximately
+12:27 UTC started Tau 2.0.11 with the real Luna provider successfully. Protected
+CRM bootstrap still returned HTTP 503 `CRM_NOT_READY` at the catalog check, so
+no chat or business call was dispatched by this run. Fresh namespace inspection
+confirmed the existing workload Team assignments were unchanged, with no human
+read contribution; the signed-in developer still sees zero of the 26 CRM tables.
+The previously requested Reader approval remains pending. No grant was added,
+and this failure continues to block pushing the pre-push gate changes.
+
+### Tau 2.0.11 and the MCP persistence retest (2026-10-11)
+
+[Tau issue #90](https://github.com/mainsequence-sdk/ms-tau-sdk/issues/90) is
+closed and its fix is released as
+[v2.0.11](https://github.com/mainsequence-sdk/ms-tau-sdk/releases/tag/v2.0.11),
+commit `7a17e86293d14120fe79c8165bc74054c4279c36`. The repository pins that
+release and the canonical dependency sync refreshed `uv.lock`, the local
+environment and deployment `requirements.txt`. Main Sequence remains 9.0.20
+and MetaTables remains 0.1.33. All 201 CRM tests and Ruff pass. The existing
+migration-gated workflow and `openai-codex/gpt-5.6-luna/medium` default remain.
+
+[Platform issue #932](https://github.com/Main-Sequence-Server-Side/tdag-django/issues/932)
+was initially closed after the maintainer repaired redundant billing allocation
+work. Its final resolution at 12:19:40 UTC corrected that diagnosis: the billing
+change removed unnecessary load, while the worker restart temporarily drained
+overlapping runtime-monitor passes. The monitor's 60-second target lock was not
+renewed during long passes, so overlapping chains occupied worker slots and
+delayed activation claims. The maintainer reports
+[issue #934's fix](https://github.com/Main-Sequence-Server-Side/tdag-django/issues/934),
+commit `487f4512d`, renews each running pass's existing lock without changing
+public contracts, permissions or migrations. This is owner evidence of the
+internal cause; the consumer read-back below verifies the repaired path.
+
+Independent public session entries recovered the earlier uncertain turn's
+final error: only `crm__list_tools` ran, and no business create or update was
+executed. A fresh authenticated REST contact search for the exact earlier
+marker returned HTTP 200, no items and `totalItems=0`. This resolves the prior
+unknown outcome without replaying its message. A new bounded verification
+used owned session `ac48ff04-8bf5-4310-b341-c81cf0db33f2`, a new unique fixture
+marker and message `1df84d82-96ae-4578-aacd-8950bcb2751a`. Its Tau 2.0.11 sender
+outlived the previous 60-second cutoff, then received structured HTTP 502
+`a2a_transport_outcome_ambiguous` after 118.75 seconds, correlation
+`d21852d9988d4aa79fcd7725933b8dde`. The message was not replayed. Operational
+events proved that the original turn continued, and public session entries
+recovered successful CRM MCP list/create/update/get calls and the final answer.
+Contact `ac06d52f-298a-41b2-9dc6-c04ace99e0af` advanced from version 1 to 2 with
+title `MCP updated and persisted`; both attribution fields identify the human
+requester `e2a4f38a-1b5f-40a3-974f-70bc8f065b3f`.
+
+This retest used the new 2.0.11 **sender** against the still-active Tau 2.0.10
+assistant revision `3a389ee8-e6ff-46a9-aff0-44e74be22ed5` and API revision
+`3d740d54-39f5-4c28-a9b5-d23008bf370d`. The recovered turn's MCP results and
+the independent read-back are separate evidence: the fresh external detail
+read was blocked before its REST request at 10:51:05 UTC by another
+`The runtime activation could not be scheduled.` refusal. A second attempt
+recorded public operation `6b209537-6469-4a44-b17a-953c9c5cd1ef`, created
+10:53:37 UTC and failed without a start time at 10:54:37 UTC. Admission became
+`unavailable`, with `can_request=false` and replicas 0/0. Issue #932 was reopened
+with this exact recurrence; its fresh internal cause was not established then.
+Admission subsequently recovered in operation
+`dd662d44-39f2-4d76-8890-415ca07a9c90`, with the caller ready at 11:07:55 UTC.
+The admitted contact detail read nevertheless returned HTTP 500 at 11:09:04 UTC
+after 66.940 seconds, request `c1e542cb1e404248f24b4af6cfefd8e2`.
+Public API logs identify `ApiResolutionError` and two approximately 20-second
+timeouts reaching the MetaTables release's platform runtime-access endpoint.
+This establishes the failing dependency path, not the platform's internal cause.
+A further read-only attempt after catalog reconciliation failed admission at
+11:16:35 UTC. Operation `1c90c639-0ca4-4a57-9c12-8c4c1261cb51` failed without
+a start time after approximately 61 seconds. No additional business write
+or archive was issued.
+Those attempts left independent persistence confirmation and fixture cleanup
+unverified. After the final Django repair, the same contact was read without
+replaying its original message or business writes. Runtime admission operation
+`f6b0c32d-0fd1-4326-bc16-e36bed7103b7` was requested at 12:27:46 UTC and started
+at 12:27:48 UTC; the client observed `can_request=true` at 12:28:59 UTC.
+Independent REST read-back returned HTTP 200 against API revision
+`11ec7117-d090-47e0-b302-9548a81e1d7b`, with the exact marker, updated title,
+version 2 and both attribution fields set to the human requester. This confirms
+that the earlier MCP create and update persisted outside their original turn.
+After a fresh exact-state check, one archive with `expected_version=2` returned
+HTTP 200 and version 3 at 12:33:15 UTC. An independent detail read confirmed
+the archive, and an exact-marker active collection read returned no items and
+`totalItems=0`. The fixture is cleaned up; no original create/update or uncertain
+write was replayed. Hosted MCP persistence and cleanup are now verified. The
+developer's local-mode table-access prerequisite above remains unresolved.
+
+The dependency update was pushed as `be0e5fc0943dc65a28ac373e2615a974323632ae`.
+Its workflow `d21a34c8-58af-4f99-bfce-f8d97e0abfa6` completed both candidate
+images; both full build logs confirm Main Sequence 9.0.20, MetaTables 0.1.33
+and Tau 2.0.11. Migration Job `832cacc7-ca36-46b7-8238-5a126b31f142` reported
+`0009 (already current; catalog reconciled)` at 11:07:01 UTC, total 538.849
+seconds. The graph confirmed migration success, and both release deployment
+runs succeeded. Both
+releases subsequently reached their intended active and desired revisions:
+API `8e88bf90-65fd-44a1-84c6-004eff66db6f` and assistant
+`1d078f53-565c-4336-92e8-f01862127d77`. The public Agent record independently
+confirms `openai-codex/gpt-5.6-luna/medium`. This verifies Tau 2.0.11 promotion;
+the earlier successful business turn remains scoped to its recorded 2.0.10
+host. The later updated API runtime's independent persistence and cleanup
+verification passed as recorded above; no new business write was sent through
+the 2.0.11 assistant during this retest.
+The older documentation
+push `7df453c` failed at its migration Job before the reported platform repair,
+because MetaTables runtime discovery timed out. Neither that older failure nor
+the new release promotion establishes uninterrupted runtime availability.
+
+Tau's timeout repair changes no CRM wire contract, authorization, schema or
+write-retry policy. [ADR 0005](../crm_core/adrs/0005-crm-application-mcp.md)
+is amended for dependency and timeout behavior; no new ADR is needed.
+Managed Main Sequence/Tau skill copies remain pinned to 9.0.6/2.0.9; the
+installed 2.0.11 package guidance was read without refreshing those namespaces.
+
+### Public A2A fixes and Tau 2.0.10 uptake (2026-10-11)
+
+[Platform issue #931](https://github.com/Main-Sequence-Server-Side/tdag-django/issues/931)
+and [SDK issue #211](https://github.com/mainsequence-sdk/mainsequence-sdk/issues/211)
+are closed. The platform maintainer reports that the sender uses public A2A
+roles and preserves structured runtime rejection instead of masking it during
+HTTP stream cleanup. This is upstream evidence, not a new CRM persistence test.
+
+The canonical SDK update and repository sync installed Main Sequence 9.0.20
+and pinned Tau to [v2.0.10](https://github.com/mainsequence-sdk/ms-tau-sdk/releases/tag/v2.0.10),
+commit `39c144f24695b7aaf2fc245e25e13cb51c4ce665`. MetaTables remains 0.1.33.
+Tau adds bounded waiting for waking application runtimes and preserves MCP
+timeouts. The installed Main Sequence sender emits `ROLE_USER` and validates
+the public response role. No CRM role override, credential fallback or write
+retry was added. New conversation defaults remain
+`openai-codex/gpt-5.6-luna/medium`.
+
+All 201 API tests, Ruff, strict MkDocs and the documentation contract pass with
+the new dependencies. Commit `82aae9b9c245612c8b199078b9ff35226682808a` was
+pushed. Workflow `8dd2983c-9846-409e-a7fd-095e704cb372` succeeded in all five
+steps at 08:38:05 UTC, including migration Job run
+`17ba919c-0473-45eb-bdc2-6bf5eee1b2fc`: schema `0009` was already current and
+the application catalog was reconciled. Both completed image logs confirm
+Main Sequence 9.0.20, MetaTables 0.1.33 and Tau 2.0.10. The API active and desired
+revision became `3d740d54-39f5-4c28-a9b5-d23008bf370d`; the assistant's became
+`3a389ee8-e6ff-46a9-aff0-44e74be22ed5`. Fresh authenticated readiness and
+bootstrap returned HTTP 200 around 08:55–08:57 UTC, with all six checks ready,
+the human identity and `assistant.enabled=true`. No GitHub check runs were
+configured for that commit; these are executed local and platform checks.
+
+The fresh canonical platform MCP sender test used owned session
+`b17527e1-4d74-49bb-8f24-8826b4005f67` and message
+`dede0066-e2d6-450e-a19b-d7f5f3e6f6ab`. Its first attempt received structured
+HTTP 409 `a2a_runtime_submission_blocked`, with `can_submit=false`, rather than
+the old masked HTTP 500. Only after that explicit pre-dispatch refusal and
+public admission becoming ready was the same message identity sent once.
+The admitted call then raised `ReadTimeout` after approximately 60 seconds,
+despite its 420-second per-call MCP deadline. Tau's platform MCP client keeps
+the backend HTTP read timeout independently of that per-call session timeout;
+this separate surface is tracked in
+[Tau issue #90](https://github.com/mainsequence-sdk/ms-tau-sdk/issues/90).
+The application MCP timeout fixes are not shown to have regressed.
+
+The server-side turn survived the sender timeout. Its operational log records
+`runtime.mcp_application.failed` with `BackendError` at 09:02:44 UTC, and public
+session reads continued to report `running`. Independent read-back was blocked
+before the REST request: supported API runtime admission failed with
+`The runtime activation could not be scheduled.` around 09:05:52 and again
+09:16:38 UTC. Public snapshots showed a queued wake with `can_request=false`.
+The runtime scheduling/access incident is tracked in
+[platform issue #932](https://github.com/Main-Sequence-Server-Side/tdag-django/issues/932);
+its internal cause remains unverified. The API and migration workload Team
+membership and approved namespace grant were checked unchanged.
+
+No admitted or uncertain write was replayed. The new fixture's existence and
+persistence remain **unverified** because normal read-back could not be
+admitted; this requires reading the existing marked fixture and turn outcome
+after access is restored, before any new write. The earlier successful Chat
+persistence proof below remains valid for its recorded runtime. A successful
+deployment or transient readiness does not establish later runtime availability
+or completion of this new MCP test. The version and readiness amendment belongs in
+[ADR 0005](../crm_core/adrs/0005-crm-application-mcp.md), without a new ADR.
+Managed Main Sequence and Tau guidance remain pinned to 9.0.6 and 2.0.9;
+the installed 9.0.20 and 2.0.10 package source and guidance were used without
+silently refreshing those separately managed namespaces.
+
+### Hosted adapter repair and controlled provisioning (2026-10-11)
+
+The hosted entrypoint now installs policy, directory and bootstrap adapters.
+Six new signed-request tests exercise default bootstrap wiring, Writer/Reader
+Team decisions, Organization admin access, Team removal between MCP calls,
+requester isolation from an admin workload, self-only delegated ownership and
+caller-scoped direct owner reads. Settings and business stores in those tests
+are stand-ins; they do not prove hosted persistence. The real SDK verifies the
+test assertions, using a test signing key.
+
+The one workflow retains its validated migration-before-deploy graph and
+automatic promotion policy. A proposed paused provisioning variant failed
+backend validation because disabling initial deployment requires pinned image
+UIDs. It was restored without selecting image UIDs or publishing that variant.
+
+On 2026-10-11 the user explicitly approved the Production owning Team and
+namespace grant. Team `mainsequence-crm-production`
+(`6b4a3104-e2e3-4c09-b746-418283f3720e`) has Writer only on namespace
+`mainsequence-crm` (`ca53e776-00bd-4ee9-ad83-dc0f49f798b1`). Its verified
+members are the new API workload User
+`c9b66783-8ce0-48d3-9b92-415a1b26fdec` and migration Job workload User
+`8c307bb6-a7b2-4ef0-8617-e47e9c055340`. The assistant has no storage grant.
+The earlier automatic approval rejection is superseded by that explicit approval.
+
+API commit `4705782` was pushed through the existing GitHub remote. The push
+webhook created workflow run `58fce803-5bbf-473c-9870-8259ff2b1203` for that
+exact commit. Its image preparation completed and migration Job run
+`9fb62849-8cb8-4b09-b5f7-8694019561b0` succeeded against the verified Production
+MetaTables runtime: PostgreSQL advanced `0008` to `0009` and all application
+catalog bindings were reconciled. All five workflow steps succeeded, including
+API deployment `f8d88cb3-d8dd-48e3-9730-ef082bebb497` and assistant deployment
+`780a777e-8f91-4abe-af2f-08df58729bb1`.
+
+API release `2de75e21-bfe1-4b77-b668-6916488ed317` initially activated MCP revision
+`8b8985d9-f7e2-4465-96be-6f293f37955a`. A real authenticated readiness call
+returned HTTP 200 with all six checks ready; bootstrap also returned 200 and
+the verified human identity. The official MCP client initialized the hosted
+endpoint, listed 66 tools including `crm_contacts_create`, and verified that a
+business read without a signed requester returns `forbidden`. These checks
+prove admission and fail-closed delegation, **not successful MCP writes**.
+
+Bootstrap initially reported the assistant disabled. Public sharing inspection
+confirmed the API workload had no view grant on the assistant Agent. Commit
+`fa5ef89` added API view access to `crm-assistant` for discovery. Workflow
+`3e1ea9c6-2fdd-4264-acfa-70fccbe60b21` succeeded in all five steps, including
+migration Job run `e41d8659-0ab5-4345-89c2-a6014ea562c7`. The API's active and
+desired revision became `949a023b-4472-48ad-8ecb-6cca3f20551d`; the assistant's
+became `32778bb1-bd6f-45de-a510-705fcf63b131`. The applied Agent view grant and
+a fresh authenticated bootstrap with `assistant.enabled=true` are verified.
+All six readiness checks pass. The assistant's API view grant and
+`acts_for_requester=true` were also verified through public platform reads.
+
+The bounded real write test created an owned AgentSession
+`199f74fe-6397-4714-a410-2fb2d3460973`, then the SDK's public A2A sender failed
+with HTTP 400: `A2A v1 Message role must be ROLE_USER or ROLE_AGENT`.
+Main Sequence 9.0.19 emits the internal `ROLE_REQUESTER`, while Tau 2.0.9 accepts
+the public roles. This matched the then-open
+[SDK issue #211](https://github.com/mainsequence-sdk/mainsequence-sdk/issues/211).
+That direct request failed before a model turn or CRM write. The user then
+completed the supported CLI browser login. Tau's credential-owning
+`MainSequenceMCPClient` invoked canonical `a2a.send_message` in Message mode,
+using the same owned session and stable message identity. It returned HTTP 500
+with correlation ID `0c6137c8cfbb4a218b703d3640f1d37c`, now tracked in
+[platform issue #931](https://github.com/Main-Sequence-Server-Side/tdag-django/issues/931).
+No retry followed that uncertain outcome. The public session remained
+`pending`, and a fresh authenticated REST search through the governed
+MetaTables store returned zero contacts for the exact verification marker.
+These checks do not establish successful MCP persistence or the platform's
+dispatch outcome. No runtime assertion, token or SDK role was patched to
+bypass these boundaries.
+
+The supported Command Center Chat reached a real model turn in owned session
+`954916fc-bc49-4cb5-ae45-cea2a6b18f0f`, using the existing Codex subscription
+and GPT-5.6 Sol. At 07:29 UTC, while the deployment above was still finishing,
+`crm__list_tools` returned `Main Sequence could not provide access to the crm
+application.` No business tool ran in that turn. Its operational log records
+`runtime.mcp_application.failed` with `BackendError`. At 07:38 UTC, after
+startup, a read-only discovery succeeded and exposed create, update and get.
+The earlier access failure is no longer reproducible after that startup;
+the logs do not establish its exact cause. A platform-advertised
+GPT-6 Astra selection previously failed before tools because Tau's installed
+model catalogue does not include it; that mismatch is tracked in
+[Tau issue #89](https://github.com/mainsequence-sdk/ms-tau-sdk/issues/89).
+
+At the user's request, the workflow now selects `openai-codex`,
+`gpt-5.6-luna` and `medium` for new conversations. Tau 2.0.9's installed
+catalogue includes that model and reasoning level. The exact workflow passes
+live backend validation without errors or warnings. Commit `c813a6d` was
+pushed, and a public Agent read confirms those exact applied defaults.
+Its migration-gated workflow `90f09ddd-ee88-4998-a50d-a071d8b47aab` was still
+running when this evidence was recorded. Existing sessions retain their
+selected model.
+
+The browser session then selected `openai-codex/gpt-5.6-luna/medium`, confirmed
+by a fresh public AgentSession read. A real turn created exactly one marked
+disposable Contact through application MCP, updated only its title with the
+current version, and read it back. Contact
+`f173c54f-1234-4274-a1f3-9fde344d9355` advanced from version 1 to 2 with title
+`MCP updated and persisted`. Both attribution fields contain the signed
+human requester UID `e2a4f38a-1b5f-40a3-974f-70bc8f065b3f`, rather than a
+workload User. A separate authenticated Python process performed a fresh REST
+detail read through the API's governed MetaTables store and independently
+confirmed the UID, exact marker, version, title and both attribution fields.
+This proves hosted MCP create/update persistence for that Contact path. It
+does not establish every tool, Team permission combination or transfer gate.
+After read-back, the exact fixture was soft-archived through the REST version
+command at expected version 2. A fresh detail read confirms `archived_at` and
+version 3, and the default active collection has zero matches for its exact
+marker. No other record was changed.
+
+Frontend commit `bfa90b0` binds its build to the active API UID above. Workflow
+`03a4e19e-1529-4505-884d-389b7222fd40` and Static Site deployment
+`7243e9c7-66a4-4638-919c-67df680a666c` succeeded. The active frontend revision
+is `f4485067-625e-4909-b41b-9905dfc0b11f`. Real CRM frontend embedding and
+Google OAuth provider registration remain unverified. The browser proof above
+uses Command Center Chat with the deployed CRM assistant, rather than the
+CRM Static Site's embedded chat.
+
+Executed checks pass: all 201 API tests, Ruff and strict MkDocs. Both current
+workflow files pass live backend validation with no errors or warnings. The
+rollout helper replaces the frontend binding only after the backend advertises
+the new API's active MCP revision in this branch Environment. It resolved and
+applied that binding. The frontend's ten tests, documentation checks,
+TypeScript, Vite and Docusaurus builds passed with the new release UID.
+
+The authored-metadata and downgrade fixes verified with MetaTables 0.1.33 on
+2026-10-10 remain the MetaTables dependency baseline. Main Sequence 9.0.20 and
+Tau 2.0.10 supersede the client/runtime versions used for this recorded proof.
+The application authorization amendment is in
+[ADR 0005](../crm_core/adrs/0005-crm-application-mcp.md).
+
+### MetaTables 0.1.33 upgrade and push preflight (2026-10-10)
+
+The two reported MetaTables issues are closed, and PyPI publishes client/API
+0.1.33. The CRM minimum requirement, lockfile, environment and canonical runtime
+export now use this version. The canonical SDK update command completed;
+Main Sequence 9.0.19 remains the latest published SDK and was already installed.
+Tau remains 2.0.9. MetaTables' managed guidance was refreshed in both CRM
+projects. The SDK-owned guidance remains pinned to 9.0.6; the updater reports
+that mismatch and leaves it untouched because no SDK scaffold refresh was
+requested.
+
+Executed verification:
+
+- The 183 API tests pass, including the real SQLite migration-history/backfill
+  test. Ruff passes. Frontend verification from `npm ci` and the committed
+  lockfile on Node 24 passes all ten tests, documentation checks, TypeScript,
+  Vite and Docusaurus builds.
+- **Issue #57:** on the verified isolated SQLite API, an authored description,
+  table-label and column-description/label change at `0009` persisted through
+  `upgrade_application()` and fresh API reads. `migrated=False`, the same table
+  UID and a successful repeat upgrade were verified. Original metadata was
+  restored through the same public helper.
+- **Issue #58:** the same real API-backed downgrade `0009` to `0007` now
+  succeeds. Exactly the two explicitly dropped OAuth bindings disappear,
+  leaving 25 active entries at `0007`. The actual migration Job restores
+  `0009`, with 27 active entries, 26 fresh application bindings and singleton
+  settings readable. Another upgrade at head succeeds.
+- The current backend accepts both single workflow files under API 2.3.0 with
+  `valid: true`, no errors and no warnings. `applicable: null` is validation
+  evidence, not an applied deployment.
+- Read-only hosted verification reports the Production Environment, system
+  revision `0012_table_creator`, and OpenAPI support for `authored_metadata`
+  and `removed_meta_table_uids`. These advertised fields establish the relevant
+  wire compatibility; they do not identify the exact running package version
+  or prove PostgreSQL migration behavior.
+
+The following deployment blockers were recorded at this preflight and resolved
+by the 2026-10-11 work above; they are retained as historical evidence rather
+than current status:
+
+1. **Production ownership is missing.** Namespace search returns no
+   `mainsequence-crm`, and the platform Team list contains no CRM owning Team.
+   The migration Job and API workload Users need membership in a Production
+   CRM Team with namespace Writer. The old API has no active revision, and
+   `migrate-crm` has not yet been created by a workflow push. The earlier
+   automatic approval review refused creation of this persistent Production
+   permission grant without explicit approval; that approval is still pending.
+2. **Frontend release binding needs coordinated rollout.** The site workflow
+   still builds with `VITE_CRM_FASTAPI_RELEASE_UID=e3cfd6ae-8fd1-4060-9a55-efb0ca9768b8`.
+   The candidate API resource key `crm` replaces `crm-api`, which creates a
+   new release UID. Publish the frontend only after that UID is resolved and
+   its workflow binding, OAuth callbacks and required access are coordinated.
+   A successful static build does not validate this live binding.
+3. **Hosted application services are not wired.** `api.erp.crm.main.create_app()`
+   installs identity and mounts REST/MCP but supplies no `crm_policy`,
+   `crm_directory` or `crm_bootstrap` adapter. The only assignments to those
+   ports in application source are in `api.erp.crm.local`. The hosted bootstrap
+   and business tools consequently retain their fail-closed readiness checks.
+   Connect those ports to the existing platform services and verify signed
+   caller/requester authorization before declaring the application usable.
+
+Both local branches have no remote divergence. The API was 29 commits ahead
+of `origin/main`, and the frontend five ahead, before this update's commit.
+Both local Git remotes still have the explicit
+`PUSH-DISABLED-during-mt014-wave` push guard. No push or Production mutation
+was performed during these checks. Do not interpret passing local tests and
+workflow validation as a guarantee that the deployment workflow will succeed
+while these blockers remain.
+
+### MetaTables 0.1.31 upgrade (2026-10-10)
+
+PyPI reported `mainsequence-metatable` 0.1.31 as the latest stable release
+(published 2026-10-10). `pyproject.toml`, `uv.lock`, the local environment and
+the canonical `requirements.txt` export now use it. Main Sequence remains
+9.0.19 and Tau remains 2.0.9. The six managed MetaTables skills were refreshed
+from the installed 0.1.31 package in both CRM repositories; the frontend has
+no MetaTables runtime dependency to upgrade.
+
+The CRM migration Job now enables the package's phase timings and explicitly
+reports catalog reconciliation, including when Alembic is already current.
+The fresh-process settings check now compiles for the API's advertised dialect,
+requires the catalog's DataSource to match, and retains its bounded read.
+The PostgreSQL-only probe failure recorded below for 0.1.27 is fixed.
+Provider identity, namespace, version table, revisions `0001`–`0009`, workflow
+ordering and public API response contracts are unchanged. ADR 0004's readiness
+boundary and ADR 0005's deployment boundary still apply; no ADR amendment or
+new schema revision is needed for these implementation fixes.
+
+Executed checks:
+
+- **183 tests pass**, including real SQLite Alembic history/backfill checks
+  and mocked tests for both query dialects, a changed runtime DataSource,
+  current/new migration outcomes and failure propagation. Ruff and the strict
+  MkDocs build pass; documentation contract tests also pass.
+- An isolated API running 0.1.31 opened the previous 0.1.27 test database,
+  verified Local/SQLite/system revision `0012_table_creator`, and reconciled
+  `0009` with all 27 entries active and their UIDs preserved. A fresh process
+  bound all 26 application tables and passed `validate_settings()`.
+- A second, fresh isolated SQLite runtime was explicitly initialized to
+  `0012_table_creator`. The actual Job applied `0001`–`0009`, emitted phase
+  timing logs and finalized 27 entries in three successful HTTP requests.
+  Fresh-process governed reads verified singleton settings and six stages.
+  A repeat upgrade reported `migrated=False` and preserved catalog UIDs.
+
+Two upstream MetaTables limitations were reproduced against its installed API,
+separately from the passing CRM tests:
+
+1. **Authored metadata is not refreshed on a repeated upgrade.** With an active
+   settings table, changing `Settings.__metatable_description__` in an isolated
+   test process and calling `upgrade_application("src.crm.migrations:migration")`
+   returned `migrated=False`, revision `0009`, but a fresh
+   `MetaTable.get_by_uid(...)` still returned the original description. The
+   client's `prepare_for_alembic()` reuses active rows, and finalization sends
+   UIDs and revision facts without changed authored metadata. This contradicts
+   the bundled migration guide. The test restored the authored value; CRM
+   metadata was not changed in source.
+2. **Dropping tables during a local downgrade can fail finalization.** On the
+   fresh, empty fixture,
+   `metatables --local migrations downgrade 0007 --provider src.crm.migrations:migration`
+   applied the DDL, then failed the first `/meta-tables/finalize-managed/` batch
+   with HTTP 400 `ordinary_table_required`. `migrations current` confirmed
+   `0007`: the failed command had already changed the physical schema.
+   The API's SQLite access validator raises that code for missing physical
+   tables. This is an API/finalization failure, not a CRM Alembic failure;
+   broader hosted behavior was not tested. After inspecting the actual
+   revision, a normal local upgrade restored `0009` successfully; a fresh
+   process verified all 27 entries active and singleton settings ready. Do not
+   describe the new removal handling as end-to-end verified for CRM downgrades.
+
+No package internals or applied CRM revisions were patched to hide these
+failures. After checking for duplicates, both were reported in MetaTables:
+[issue #57](https://github.com/mainsequence-projects/MetaTables/issues/57)
+tracks authored-description refresh, and
+[issue #58](https://github.com/mainsequence-projects/MetaTables/issues/58)
+tracks SQLite downgrade finalization. Both were verified open on 2026-10-10.
+Hosted PostgreSQL operations, deployed permissions and shared API performance
+remain unverified. No Production mutation or deployment was performed.
+The earlier deployment is still awaiting approval for the Production CRM
+Team/namespace Writer grant, and the Git push guard remains in place.
+
+### Earlier MCP and dependency verification (2026-10-09)
+
+On 2026-10-09 the CRM assistant's business tools moved from native Tau
+extensions to the API-owned authenticated `/mcp` endpoint, as recorded in
+[ADR 0005](../crm_core/adrs/0005-crm-application-mcp.md). The installed versions
+are Main Sequence 9.0.19, MetaTables 0.1.27, Tau 2.0.9 and MCP 1.30.0. Canonical
+`mainsequence code-repository sync --path .` refreshed dependency artifacts;
+`ms-tau skills sync --path .` refreshed all five Tau skills to 2.0.9.
+
+Executed after the migration:
+
+- All **178 API repository tests** passed. Protocol tests exercise initialize,
+  catalogue discovery and tool calls through ASGI, using signed test assertions
+  and fake policy/directory/stores. REST/MCP create and update parity, strict
+  arguments, permission denial, missing or malformed requester, concurrent
+  requester isolation, unavailable adapters, disabled modules, bounded results,
+  cancellation, and redacted failures are covered. These are not live database
+  mutation proofs.
+- The official MCP client traversed the local bridge and loopback launcher's
+  verified identity boundary in-process. Its sign-in and persistence were test
+  fixtures. The extension loader exposes only two generic tools locally and no
+  native business tools when hosted. A lost write response is not retried.
+- Ruff passed for `api/crm`, `api/tau`, `src/crm` and `tests`; strict MkDocs and
+  `git diff --check` passed. The catalogue's operation bindings and schemas
+  match the previous transport, with 66 tools enabled or 46 without Solution
+  Selling.
+- The current local platform's `validate-workflow` endpoint accepted the
+  actual updated `crm-api.yaml`: workflow API 2.3.0, `valid: true`, no errors or
+  warnings, and `applicable: null`. This validates the declaration without
+  applying it or establishing deployment permissions.
+
+No MCP migration commit, push, deployment, hosted migration or real provider
+turn was performed. Before rollout, verify hosted policy/directory wiring,
+admin-approved requester delegation, MetaTables compatibility and table grants.
+The API key changes from `crm-api` to `crm`, so applying the workflow creates a
+new API release identity. Coordinate the frontend release UID, Google OAuth
+callbacks, replacement workload Team membership and grants; then verify a real
+requester read/write and denial through the deployed assistant. The current
+frontend release UID has deliberately not been replaced with a guessed value.
+
+On 2026-10-09 the optional Tau dependency advanced from 1.2.14 to the
+published `v2.0.9` release. The two frontend packages advanced to Command
+Center SDK 0.5.17 and Command Center AI 0.0.11. The locked Python and npm
+dependencies installed locally; all 167 CRM API tests, all 10 frontend tests,
+and the frontend application build passed. The upgraded local Assistant was
+also exercised against a disposable browser fixture: it sent a message,
+displayed the response, and restored both after reload. The fixture servers
+were stopped afterwards. These checks do not prove that the new Tau version
+starts in a hosted Agent or that the updated frontend works against a deployed
+Command Center session. The Tau coding-skill copy was subsequently refreshed
+to 2.0.9 as part of the authorized MCP migration.
+
+On 2026-10-09 the CRM API upgraded to `mainsequence` 9.0.19 and
+`mainsequence-metatable` 0.1.27, the latest stable releases reported by the SDK
+release check and PyPI. Both minimum dependency versions, `uv.lock`, the local
+environment and `requirements.txt` now agree. The MetaTables client skills were
+refreshed in both CRM projects. SDK-owned skills remain pinned to 9.0.6; their
+separate refresh and the managed `AGENTS.md` refresh were not requested. The
+installed 9.0.19 SDK code and bundled guidance were used for this upgrade.
+
+The SDK now requires signed `team_uids` and `is_organization_admin` caller
+claims. The HTTP fixtures supply those platform facts, and malformed team or
+admin facts are rejected by the real verifier. The 167 repository tests pass,
+including all CRM migrations on isolated SQLite; Ruff and the strict MkDocs
+build pass. No CRM model,
+revision, route or business rule changed.
+
+Both projects retain exactly one workflow file. The API keeps the
+`prepare_image` → `run_job` → `deploy` graph, with the API and assistant waiting
+for the migration. Each workload now declares view access to the `MetaTables`
+branch for discovery, as the current client deployment guidance requires. The
+frontend adds an explicit `deploy_site` step to `crm-site.yaml`. The configured
+local backend's branch-scoped `workflow-template/` and `validate-workflow/`
+endpoints were called for both repositories. They advertise API 2.3.0 and
+accepted both final files with `valid: true`, no errors and no warnings.
+Validation returned `applicable: null`; it did not apply a workflow or verify
+release readiness. Resource keys, workflow paths and every-push policies stay
+the same.
+
+The installed MetaTables 0.1.27 API was also exercised on a fresh isolated
+local SQLite runtime, with system revision `0012_table_creator`. The CRM
+provider applied `0001`–`0009` and finalized 27 catalog entries: all active,
+none reserved or failed. A fresh process bound all 26 CRM tables at `0009`.
+Explicit SQLite governed reads found the default settings row and six seeded
+pipeline stages. Running `jobs/erp/crm/migrate.py` against that same local runtime
+then reported `0009 (already current)`.
+
+The CRM's unmodified `CatalogRegistry.validate_settings()` probe emits the
+default PostgreSQL operation dialect. Calling it against SQLite returned
+`422 compiled_sql_dialect_mismatch`; the explicit SQLite reads above do not
+certify CRM readiness or its PostgreSQL business commands. No hosted governed
+write, rollback or deployed caller assertion was exercised.
+
+The hosted MetaTables API version, CRM Team membership and namespace Writer
+grant still need verification before rollout; see
+[persistence](persistence.md#migration-and-runtime-boundary). No hosted migration,
+deployment, commit or push was performed for this update.
+
+Revision `0009` changes Interactions to a participant list and optional Company.
+It has not been applied to a hosted environment. The deployment workflow's
+migration Job applies it before the API that serves this contract rolls out.
+Before using the new Calendar import against a live API, verify fresh-process
+catalog binding and exercise governed create/update plus rollback on a
+disposable provider. A running API still on `0008` does not serve this contract.
+
+On 2026-10-04 the API moved to `mainsequence` 9.0.6, `mainsequence-metatable`
+0.1.20 and `ms-tau-sdk` 1.2.14 (release tag `v1.2.14`), the latest releases, and
+the vendored SDK, MetaTables and Tau skills were copied again from those
+versions. No CRM code, model, revision or workflow changed:
+
+- SDK 9.0.6 never replays a POST, PUT, PATCH or DELETE by itself. Read-only
+  retries, their backoff and token renewal share one timeout budget per call,
+  which replaces an outer loop of up to 60 attempts. Every governed CRM
+  operation is a POST, so an uncertain write now fails instead of running
+  twice, as the rule to read server state before retrying expects. PyJWT and
+  cryptography are now base SDK dependencies and the `server` extra is gone;
+  the CRM keeps its own requirements on both because its Google OAuth code
+  imports them.
+- MetaTables 0.1.19 runs one local API per local storage directory and removes
+  the Local/Hosted switch; 0.1.20 retries runtime-access requests that time out
+  during hosted discovery and requires SDK 9.0.6. See
+  [local development](local-development.md#apply-migrations-locally).
+  The 0.1.17 and 0.1.18 foreign-key rules are unchanged, and every CRM foreign
+  key stays `ON DELETE RESTRICT`.
+- `ms-tau-sdk` 1.2.13 lets local mode take the user's access token from the
+  Main Sequence CLI session; 1.2.14 changes only documentation. The sibling
+  launcher starts Tau without token variables, which the previously locked
+  1.2.12 rejected in local mode. This follows from the two releases' settings;
+  no local Tau process was started. See the
+  [optional Tau runtime](local-development.md#optional-tau-runtime).
+
+**Hosted prerequisite:** upgrade the Environment's hosted MetaTables API to
+0.1.19 or later before this branch is pushed; 0.1.18 is not enough. The
+client's `RuntimeContext` rejects fields it does not know, 0.1.19 removed
+`runtime_switch_available`, `runtime_switch_error` and
+`hosted_environment_target` from it, and an API on 0.1.18 or older still sends
+all three in its `/runtime-context/` response
+([MetaTables issue #33](https://github.com/mainsequence-projects/MetaTables/issues/33)).
+`upgrade_application()` reads that response before it migrates anything, so
+against an older API the `migrate-crm` Job fails, `deploy_api` and
+`deploy_assistant` never run, and the rollout stops. An offline replay of a
+0.1.18-shaped API with the locked client showed this: the Job's first request,
+`GET /runtime-context/`, failed with `extra_forbidden` on those three fields. In
+the same replay the CRM's catalog lookup and governed operations, which the API
+and the loopback launcher run, sent only their own requests, did not read the
+runtime context and were unaffected. The incompatibility therefore stops the
+deployment at its migration Job.
+
+Offline, the lock and `requirements.txt` agree,
+`python -m metatables.sdk_compat` accepts SDK 9.0.6, the 131 repository tests
+pass, including the whole `0001`–`0009` history with legacy rows on a temporary
+SQLite file, and the strict MkDocs build passes. The backend workflow
+validator, replayed offline from tdag-django `5a6c9280b` (`development`),
+accepted the unchanged `crm-api.yaml` with no errors or warnings. The
+branch's `validate-workflow/` endpoint was not called.
+
+Later on 2026-10-04 the isolated local migration proof was repeated on 0.1.20 at
+commit `569e77a`, once the local development backend answered and the CLI was
+signed in to it. A local MetaTables API ran from a fresh, isolated storage
+directory, never the default one, and was stopped afterwards. `metatables --local
+runtime initialize` brought the SQLite runtime to system migration
+`0010_cascade_targets` (none pending), and
+`metatables --local migrations upgrade --provider src.crm.migrations:migration head`
+applied `0001` through `0009` and finalized 27 catalog entries, the 26 tables and
+the Alembic registry: 27 `active`, 0 `reserved`, 0 `failed`.
+`migrations current` reported `0009 (head)`, and a second upgrade finalized
+nothing and reported `migrated: False`. All 27 `mainsequence-crm` catalog rows
+were `active`, `alembic_managed` and at `0009` on the local DataSource. The
+CRM's catalog resolver bound all 26 tables; revision `0004` had seeded the
+`default` settings row, the default `Sales` pipeline and its six stages. The
+impact pre-flight on Company reported deleting rows allowed with five `restrict`
+edges, and updating keys allowed with no edges. The Job script, run against that
+runtime through `configure_local_client()`, reported
+`src.crm.migrations:migration: 0009 (already current)`. Nothing hosted was
+exercised.
+
+Later on 2026-10-04 the API installed the SDK's request identity
+(`install_request_identity`) in `create_app()` and moved its caller lookup,
+`authenticated_actor()`, onto `User.get_logged_user()`. Since
+PodDeploymentOrchestrator `3057764` the platform's FastAPI launcher no longer
+resolves callers itself. It serves an app only when that integration declares
+itself installed, in the caller mode the deployment selects and with exactly
+the deployment's public ingress, so every new revision of the previous code
+stopped at startup while the old one kept serving. The two Google public
+routes are now mounted on the application itself: the locked FastAPI 0.141
+lists an included router in `app.routes` as one entry, so the launcher's own
+`FASTAPI_PUBLIC_INGRESS` check, and the request identity, could not find them.
+That stopped startup too, independently of the identity change. The API
+release's failed runtime activation, recorded below with the Google Workspace
+extension, is consistent with it, but its logs were not inspected. The OpenAPI
+document did not change. Checked locally:
+
+- With a simulated deployment environment (assertion mode, trusted issuer, key
+  URL, release and Environment, and the workflow's public ingress),
+  PodDeploymentOrchestrator's `require_request_identity` and `serve_fastapi`,
+  imported from its checkout, accepted the app. On the previous commit the
+  first raised "Application request identity is not installed" and the second
+  "Invalid FASTAPI_PUBLIC_INGRESS configuration". The launcher's runtime app
+  started, answered `/ms-health-deployment` as ready, rejected requests without
+  a valid caller assertion or with only `X-User-UID` (`401`), passed a request
+  with a platform-signed assertion to CRM code, and served the completion page
+  without a caller only when it was admitted as public ingress.
+- `tests/erp/crm/integration/test_request_identity.py` covers the declaration, signed and local
+  callers, and their rejection; every other HTTP test now authenticates
+  through the same verification. The 165 repository tests and the strict
+  MkDocs build pass.
+- The loopback launcher, run against the local development backend with the
+  saved sign-in, returned the signed-in user from `/principals/`, rejected
+  caller identity headers and served the Google completion page anonymously,
+  as the previous commit's launcher does. Readiness reported the same
+  unavailable catalog on both.
+
+Not verified: a deployed release. It needs Main Sequence's caller-assertion
+signing, published keys and gateway forwarding for this release. Deployed CRM
+routes still fail closed after verification because no hosted policy,
+directory or bootstrap adapter is wired; that predates this change.
+
+On 2026-10-03 the API moved to `mainsequence` 9.0.5 and `mainsequence-metatable`
+0.1.18. Since 0.1.14, MetaTables migrates hosted application databases only
+from a Job in the application's own deployment workflow, so `crm-api.yaml` now
+runs the `migrate-crm` Job (`jobs/erp/crm/migrate.py`) from the candidate image and
+deploys the API only after it succeeds. The backend workflow validator's
+execution check accepted that graph when run offline; the exact branch's
+`validate-workflow/` endpoint was not called.
+
+Later on 2026-10-03 the CRM assistant's declaration moved from
+`crm-assistant.yaml` into `crm-api.yaml`, which is now the repository's only
+workflow file, and the assistant now deploys only after the `migrate-crm` Job
+succeeds. Its key and settings did not change; only the `migrate-crm`
+description now names the assistant. The tdag-django workflow validator at
+`35ad44ce0` (`development`) was replayed offline from its source, with only the
+branch-bound checks skipped as the validator itself skips them without a
+branch: source indexing and the release create serializer. It accepted the new
+file with no errors or warnings, and it also accepted the two previous files.
+It rejected the new file next to the old `crm-assistant.yaml` with
+`cross_file_conflict`, so the two must never be pushed together. The branch's
+`validate-workflow/` endpoint was not called, because the local backend did not
+answer. See [moved workflow resources](#moved-workflow-resources) for what the
+push changes on the platform.
+
+MetaTables 0.1.17 accepts foreign keys with `CASCADE`, `SET NULL` and
+`SET DEFAULT` actions, records each table's cascade targets (system migration
+`0010_cascade_targets`) and adds the `MetaTable.get_impact()` pre-flight.
+0.1.18 makes write on a table depend only on that table's own grants. Every
+CRM foreign key is `ON DELETE RESTRICT` by design, because CRM records are
+archived rather than cascade-deleted, so neither release changes a CRM model
+or revision.
+
+Revisions `0001`, `0002`, `0004`, `0005`, `0006` and `0009` gained SQLite forms
+of their PostgreSQL-only SQL. Their PostgreSQL statements did not change: on a
+throwaway PostgreSQL 14 database, the original and the changed history, run
+empty and with legacy rows seeded at `0001` and `0008`, issued the same
+statements against the CRM tables with the same parameters, left the same rows
+and produced the same `pg_dump --schema-only` output. Only the order of
+catalog reflection queries varied, as it does between two runs of the
+original.
+
+On a fresh, isolated local SQLite runtime that MetaTables 0.1.18 initialized
+through system migration `0010_cascade_targets`,
+`metatables --local migrations upgrade --provider src.crm.migrations:migration head`
+applied `0001` through `0009` and finalized 27 catalog entries, the 26 tables
+and the Alembic registry, all `active`. `migrations current` reported
+`0009 (head)` and a second upgrade changed nothing. The CRM's catalog resolver
+bound all 26 tables, and revision `0004` had seeded the settings row, the
+default pipeline and its six stages. The impact pre-flight for deleting Company
+rows reported the action allowed, with five `restrict` edges from the tables
+that reference Company. The Job script, run against that runtime through
+`configure_local_client()`, reported `0009 (already current)`. No hosted
+MetaTables API, Job run or deployment was exercised. The first hosted run of
+the Job follows the next push, which since the 2026-10-04 move needs the
+Environment's MetaTables API on 0.1.19 or later; check its workflow run and
+DeploymentRuns before calling the API deployed.
+
+On 2026-10-01 the API moved to `mainsequence` 9 and the separate
+`mainsequence-metatable` 0.1.5 client (`metatables`). Governed operations now
+send one DataSource UID with their SQL and no declared table scope. This move
+was checked offline only: imports, provider loading and the unchanged
+`0001`–`0009` revision history, operation payloads against the installed client
+model, unit/route tests, Ruff and a strict MkDocs build. No MetaTables API,
+catalog resolution, governed read or write, or migration was exercised. Before
+a release, verify a fresh process against the MetaTables API deployment and
+repeat the governed mutation and rollback gates below.
+
+Later on 2026-10-01 the API moved to `mainsequence` 9.0.2 and
+`mainsequence-metatable` 0.1.6 with no CRM code change. The client wheel now
+installs only the `metatables` package, so this repository's top-level `api`
+package no longer shares an import name with the bundled MetaTables server.
+Hosted API discovery selects the one `metatables` deployment in the caller's
+Organization Environment; `METATABLES_API_URL` is accepted only for a loopback
+development API, and the CRM does not set it. This upgrade was also checked
+offline only, with network access blocked: the client's SDK compatibility
+check, provider loading and the unchanged `0001`–`0009` revision chain, the
+unit/route tests, Ruff with no new findings, and a strict MkDocs build. The
+live checks above remain outstanding.
+
+| Gate | Evidence needed |
+| --- | --- |
+| Local unit and route checks | Passing test output for the changed code |
+| Documentation | `mkdocs build --strict` with no warnings |
+| Package contents | Build source and wheel artifacts containing the docs-independent Python packages |
+| Migration and catalog | Local SQLite upgrade of the provider, the deployment workflow's `migrate-crm` Job succeeding before the API and the assistant roll out, and a fresh process resolving active MetaTables from the platform catalog |
+| Governed mutation | Separate live multi-table commit and intentional failure rollback on a disposable provider; API readiness does not establish this |
+| Release | Exact tested commit/image/resource and a deployed frontend/API contract check |
+
+On 2026-09-23, the configured local provider upgraded through `0004`. The
+provider-scoped migration removed physical workspace columns/table, preserved
+its one pipeline and six stages, and created the `settings` table. The two
+obsolete catalog entries (`command_receipt` and `workspace`) were deleted
+individually after dependency checks, with dependent-table deletion disabled.
+A fresh process resolved all 18 current CRM bindings at revision `0004` and
+read the settings, empty company/contact/deal collections, the pipeline
+collection, and all six board columns through governed MetaTable operations.
+Live governed probes on the user-confirmed disposable CRM provider then
+created a company with its activity event, verified an intentionally invalid
+activity insert rolled back both rows, created a contact with its primary
+affiliation, and transitioned its primary company while retaining a former
+stint. Transfer probes created a source connection and import job, staged one
+row, saved mapping, and validated its plan. All successful probe records were
+deleted by exact UID; none are production data. These checks establish the
+tested command paths, not all possible concurrent interleavings. A deployed
+frontend/API release remains unverified. Do not describe an unmounted endpoint,
+mocked test, or planned feature as a deployed feature.
+
+The repository-layer refactor was checked locally with route/unit tests,
+Ruff, a strict MkDocs build, and an offline source/wheel build. These checks
+cover query-boundary validation and package inclusion. The broad live
+multi-table rollback probes above predate that refactor. The contact social
+probe below exercises one post-refactor write path, but does not repeat every
+earlier rollback or concurrency gate; deployed release verification remains
+outstanding.
+
+On 2026-09-24, provider-scoped revision `0005` applied the contact social
+schema change. A preflight governed count found zero contacts and zero
+standalone LinkedIn values in this provider. After upgrade, a fresh process
+resolved all 18 CRM bindings and read the new `socials` column through a
+governed query. A subsequent governed live probe created one synthetic contact
+with LinkedIn and X links, patched it to remove LinkedIn and add GitHub while
+retaining X, and read back the incremented version. Its contact and activity
+rows were then removed by exact UID. The test proves this create/patch path on
+the disposable provider, but does not exercise legacy URL backfill on
+nonempty data, every merge write interleaving, or a deployed API release.
+
+On 2026-09-24, provider-scoped revisions `0006` and `0007` added core
+Interaction, five Solution Selling tables, and the wider activity event
+type. The local provider finalized six new table bindings and a fresh process
+resolved all 24 at the new head. A governed empty prompter collection read
+passed. A live governed prompter create and versioned patch wrote its activity
+events; the synthetic prompter and those events were deleted by exact UID.
+An intentional invalid activity insert in a two-table command rolled back
+its prompter insert; a governed count confirmed zero residual rows. These are
+local provider checks. A separate governed profile create/read passed with a
+typed nine-cell JSONB template and the full-length activity entity type; its
+synthetic profile and activity rows were also deleted by exact UID. A fresh
+local FastAPI process with `INCLUDE_SOLUTION_SELLING=true` returned enabled
+bootstrap state and empty module/core Interaction collections through HTTP.
+These checks are
+not proof of every new relationship path or a deployed
+frontend/API release.
+
+The shared-service refactor on 2026-09-24 moved mounted CRM business
+operations from HTTP helpers into `src/erp/crm/services/`. Local tests compare
+direct service and HTTP Contact commands, permission denial, semantic scope
+validation, and transfer direction authorization using injected stores. The
+full local test suite, Ruff, and strict MkDocs build passed. These tests use
+fakes for the parity cases; they do not prove a live Tau tool, a new governed
+mutation path, or a deployed release.
+
+The optional Tau dependency was updated to the pinned `ms-tau-sdk` 1.2.8
+release commit. The ASGI entrypoint reads process settings; local tests verify
+that setting both exclusion variables removes the optional SDK tool sources
+from its configuration, while unset exclusions retain the SDK defaults. SDK
+catalogue tests cover composition with project tools and A2A Task controls.
+The project extension registers 46 typed CRM tools with Solution Selling
+disabled, or 66 when enabled. Local fake-store tests verify the tool and HTTP
+Contact commands reach the same shared service behavior, deny unauthorized
+calls, reject model-supplied actor arguments, and fail closed without a trusted
+runtime context. They do not establish a live principal or policy binding.
+The managed Agent release was deployed on 2026-09-26; provider, identity, and
+deployed-catalog behavior remain unverified through a live CRM conversation.
+
+The Google Workspace extension is implemented in source and enabled by
+`extensions.google_workspace.active: true` in `config/erp/crm/settings.yaml`. Local Google
+Contacts consent and preview were verified as described below; the deployed
+frontend/API handoff remains **unverified**. The CRM API workflow
+declares exact FastAPI `public_ingress` for
+`GET /extensions/google/oauth/callback/` and
+`GET /extensions/google/oauth/done/`. The exact branch's Main Sequence
+`validate-workflow/` endpoint accepted the API 2.3.0 declaration with no
+errors or warnings. The API release deployment failed during runtime activation,
+so its public ingress has not been externally probed. Confirm the release's
+`effective_public_ingress` and backend-issued `public_url` before registering
+the Google redirect URI; see the
+[setup procedure](../google_workspace_module/setup.md#configure-public-callback-routes-on-main-sequence).
+Migration `0008` applied to the configured local provider and a
+fresh process resolved 26 active bindings. A synthetic governed probe
+created an OAuth attempt, activated a token-shaped connection, imported a
+Contact with source identity and activity event, disconnected, and removed all
+probe rows. The probe used no Google account or real credentials. The
+governed import rollback probe forced the activity insert to fail and
+confirmed that neither the Contact nor source identity committed; its
+synthetic setup rows were removed. These checks prove the selected local
+command paths. A further synthetic Calendar probe created a Company and
+Google connection, imported a meeting Interaction with source provenance,
+updated it with the expected version, and removed all probe rows. A denied
+OAuth attempt also reached a terminal failure state in the governed local
+store and was removed. These checks do not prove live Google consent or
+production deployment. With the ignored local API `.env` flag set to `true`,
+a loopback FastAPI process returned ready status, bootstrap
+`modules.google_workspace=true`, the signed-in user's import capability, and
+an empty Google connection list. A local Chrome session displayed the
+**Google Contacts**, **Gmail correspondents**, and **Calendar events**
+destinations and the setup guidance when the OAuth client was absent. This is
+local UI evidence, not a real Google grant or deployed Command Center check.
+The Google Cloud app also needs the audience and scope review described in the
+[setup guide](../google_workspace_module/setup.md) before production use.
+Local tests of OAuth and source parsing are not evidence of those live gates.
+The later unified consent change requests Contacts, Gmail, and Calendar read
+permissions in one authorization. Its local scope and partial-grant tests do
+not establish that a live Google account granted all three or that the
+updated API and frontend are active in a deployed release.
+
+On 2026-09-26, a local Chrome session completed Google Contacts consent for the
+signed-in user and the CRM showed the connected account. A prior preview click
+returned HTTP `503` because the loopback API's SDK signed-user revalidation
+exceeded its 10-second deadline; the UI placed the error below the cards. The
+local launcher now revalidates at most every five minutes with a 20-second
+deadline. The preview button now displays loading progress and errors appear
+above the account card. Calendar and Company reads no longer start when the
+Calendar destination opens. Contact source links and matches are resolved in
+bounded batch reads. After restarting the full local stack, the live Google
+Contacts preview returned HTTP 200 and rendered four candidates, all defaulted
+to Skip. No import was committed. This is a verified local Google read, not a
+deployed release, Gmail, Calendar, or import verification.
+
+The follow-up source-navigation fix shares the connection read across Google
+destinations for one signed-in CRM session and checks a pending OAuth attempt
+on tab return or explicit **Check connection**, rather than continuous
+background polling. The Contact candidate now opens a prefilled create modal;
+the reviewed fields are accepted only by the Contact-create import path.
+In the local Chrome session, switching from Contacts to Gmail and back caused
+no additional Google extension request after the first connection read.
+Clicking a Contact name opened a modal with its Google name and email, and
+Cancel produced no import request. The edited-field import contract passed a
+fake-store test. A live save through the modal and a deployed OAuth flow
+remain unverified.
+
+Earlier on 2026-09-26, the local stack was relaunched with
+`INCLUDE_SOLUTION_SELLING=true` and
+`INCLUDE_GOOGLE_WORKSPACE_EXTENSION=true`. Its protected bootstrap returned
+HTTP 200 with both `modules.solution_selling` and
+`modules.google_workspace` set to `true`; live OpenAPI included both
+`/extensions/solution-selling/` and `/extensions/google/` paths. The managed
+CRM API workflow at that time declared both values. This is historical local
+evidence for the previous environment-switch version.
+
+[ADR 0004](../crm_core/adrs/0004-single-bootstrap-and-assistant-runtime.md)
+is now implemented in source: the API loads `config/erp/crm/settings.yaml`, emits embedded
+readiness and runtime-selected assistant state in one bootstrap response, and
+the frontend makes that single startup request. The local Tau adapter sends
+A2A Messages through the Vite `/tau` proxy. A live local bootstrap returned
+HTTP 200 with readiness `ready`, both extensions active, and assistant runtime
+`local`. Tau accepted the A2A Message shape and reached model inference, but
+the model provider request failed with `CERTIFICATE_VERIFY_FAILED` on this
+machine. An end-to-end chat reply remains unverified. Repository tests and a
+frontend build verify the source behavior.
+
+On 2026-09-26, CodeRepository sync, which still committed and pushed with the
+SDK installed then, published API commit `5f639dc5` and
+frontend commit `a6506358`. The managed CRM assistant DeploymentRun succeeded
+and bound Agent `CRM assistant` to its active runtime release. The Static Site
+DeploymentRun also succeeded and published the protected frontend. The CRM
+FastAPI DeploymentRun passed workflow validation and image build, then failed
+at `deploy_runtime` with `runtime_deployment_failed`; it has no active revision.
+Local import and `/healthz` checks passed in a stripped environment. The
+platform exposed no more specific failure in that run or its available
+application logs. An offline wheel build then showed that the required
+`config/erp/crm/settings.yaml` was absent from the Python package, a plausible startup
+cause; the package definition now includes that file. The deployed
+frontend/API contract, public Google callback, and managed assistant
+bootstrap remain unverified until the API is active.
+
+The API retry with the packaged YAML still failed at `deploy_runtime` and
+produced no application logs. The API workflow now requests 0.5 CPU and 1 GiB
+memory explicitly, matching the resource fields used by other FastAPI
+releases. This is a deployment configuration attempt, not evidence that the
+resource request caused the earlier failure.
+
+That explicit-resource attempt also failed at `deploy_runtime` while the
+assistant deployed from the same image. A local file-path load of the declared
+FastAPI `source_path` raised an ImportError because its entrypoint used
+relative imports. The entrypoint now uses package-absolute route imports and
+loads both by module name and by file path. The platform's loader behavior
+is not exposed in the public error, so this check identifies a possible
+startup cause rather than proving the prior failure's root cause.
+
+On 2026-09-27, the optional Tau dependency was updated to `ms-tau-sdk`
+1.2.11 and its version-matched skills were synchronized. `uv sync --locked`
+installed the tagged release, `api.agents.crm.main:app` exposed both new local
+conversation-history routes in its OpenAPI schema, all 125 repository tests
+passed, and `mkdocs build --strict` passed. A separate frontend browser fixture
+exercised conversation listing, reload hydration, selection, and continuation
+through the local API shape. This does not establish that a live Tau process
+has persisted a new conversation; no local Tau process was listening during
+that browser check.
+
+Later on 2026-09-27, the running local stack at `127.0.0.1:38644` exposed a
+ready CRM bootstrap and Tau runtime. A live browser send initially failed with
+HTTP 400 because the frontend still sent the old `ROLE_REQUESTER` Message role;
+Tau 1.2.11 requires `ROLE_USER`. After updating the frontend wire format, the
+same browser received a real Tau reply, and reloading the session URL restored
+both public messages from Tau's history API. This verifies local Message
+send and persisted history through the Vite proxy, not a deployed Agent run.
+
+## Publishing
+
+> The following consolidation notes describe the earlier move of the assistant
+> declaration. The new MCP migration additionally renames API resource `crm-api`
+> to `crm`; its release identity and frontend/OAuth bindings must change on
+> rollout. Follow [ADR 0005](../crm_core/adrs/0005-crm-application-mcp.md).
+
+Since SDK 9.0.5, `mainsequence code-repository sync` only refreshes the local
+dependency files: `uv lock`, `uv sync` and
+`uv export --locked --no-dev --no-hashes`. It no longer bumps the version,
+tags, commits or pushes. Publishing is a plain `git push`, and
+`.mainsequence/workflows/crm-api.yaml`, the repository's only workflow file,
+decides what deploys: it runs the `migrate-crm` Job and then deploys the API
+and the CRM assistant. Push only after the Environment's hosted MetaTables API
+runs 0.1.19 or later. Against an older API the Job fails before it migrates
+anything and neither the API nor the assistant rolls out; see
+[persistence and migrations](persistence.md#migration-and-runtime-boundary).
+The API also needs Main Sequence to sign and forward a caller assertion for
+each request to this release: without one, every route outside the declared
+public ingress answers `401`.
+
+## Moved workflow resources
+
+The backend identifies a workflow resource by its branch, workflow file and
+key. The push that removes `crm-assistant.yaml` moves one declaration into
+`crm-api.yaml`:
+
+| Old workflow file | Key | Kind | Display name |
+| --- | --- | --- | --- |
+| `.mainsequence/workflows/crm-assistant.yaml` (workflow `crm-assistant`) | `crm-assistant` | `harness_agent` | `CRM assistant` (from `.agents/domains/crm/agent_card.json`) |
+
+**Delete nothing after the push.** A Harness Agent is the exception to the
+rule that a moved declaration creates a new target. The backend finds the
+branch's Agent by its CodeRepositoryBranch, not by workflow file, and
+reconciles the release bound to that Agent. The push keeps the same Agent, with
+its UID and sessions, and the same release, with its UID, revision history and
+runtime URL. Do not delete the assistant's release or Agent: that release is
+the live assistant, and deleting the Agent also deletes its sessions.
+
+What else the push does depends on the tdag-django code that processes it:
+
+- From `bd89608b4` (ADR-077 §5, issue #767), the push first moves the release's
+  workflow binding from `crm-assistant.yaml` to `crm-api.yaml`. The execution
+  graph then owns the assistant's deployment and holds it until `migrate`
+  succeeds. From `4a2833f12` (ADR-077), a push also deletes workflow targets
+  that no file declares any more. The assistant is still declared, so nothing
+  is deleted.
+- Before `bd89608b4`, the release keeps its binding to the removed file. The
+  Agent and release are still kept, but the generic per-push deployment does
+  not see that the graph owns the assistant and can deploy it without waiting
+  for the migration. Push only to a backend that runs `bd89608b4` or later.
+
+After the push, check that:
+
+1. The repository-event result lists only `crm-api.yaml`, valid, with
+   `crm-assistant` queued in its workflow run. On a backend with ADR-077, its
+   `deletions` list is empty.
+2. The branch read with `include=workflow_runs` shows `deploy_assistant`
+   starting only after `migrate` succeeded.
+3. `CRM assistant` has the same Agent UID and runtime release UID as before the
+   push.
+
+Nothing that refers to the assistant's identity needs to change, because the
+identity is kept:
+
+- `src/agents/crm/discovery.py` finds the Agent at each bootstrap by the Agent
+  Card name, this branch and the Environment, and requires a bound runtime
+  release. This repository stores no Agent or release UID.
+- The frontend repository reads `agent_uid` from the bootstrap response. Its
+  `crm-site.yaml` pins only `VITE_CRM_FASTAPI_RELEASE_UID`, which belongs to
+  `crm-api`; that declaration did not move.
+- Command Center's per-user Agent shortcuts and the Agent's sessions point at
+  the Agent row, so they stay valid while the Agent exists.
+
+`crm-api` and `migrate-crm` stay in `crm-api.yaml` under the same keys and keep
+their identities.
+
+## 2026-10-13 prompter bulk deletion
+
+The local frontend uses canonical SDK discovery to offer explicit selection,
+**Delete prompters**, preflight and typed confirmation. API tests cover discovery,
+permission revocation, invalid selection, stale/missing versions and the atomic
+statement boundary. The indexed Command Center contract fixtures validate, and
+frontend adapter tests preserve displayed versions across preflight/execution.
+Focused API tests, frontend tests, app/user-guide builds, strict MkDocs, route
+documentation parity and the closed theme audit passed.
+
+Live verification used the local API with the existing **hosted PostgreSQL**
+MetaTables runtime (`local_mode: false`), not local SQLite. Two owned disposable
+prompters were created; one was updated. A stale deletion returned `409`, and
+fresh reads proved both rows remained active. Deleting with current versions
+returned `deleted_count: 2`; both active detail reads then returned `404` and
+the fixture search returned zero rows. A fresh client bound all 26 CRM tables
+and confirmed both archived rows, incremented versions and two archival events.
+Only those verification records were mutated. Evidence is ignored under
+`.local/prompter-bulk-verification/`.
+
+Browser checks verified list checkboxes, page-only selection, the SDK action
+picker, allowed preflight, the disabled confirmation button before typing
+`DELETE`, and cancellation. Successful deletion was verified through HTTP,
+not by pressing the browser's final confirmation. SQLite execution and deployed
+delivery of this change remain unverified. No push was performed.
+
+The standard local page at `http://127.0.0.1:38644/solution-selling/prompters`
+also exposed the action after its API restart. At 375 × 812 the same SDK list
+stacked its records, retained the action picker and had no horizontal overflow.
+This was a viewport check, not the full coarse-pointer layout matrix.
+
+## 2026-10-13 Lead display labels
+
+Lead list and detail reads resolve Contact names and primary Company labels in
+one governed MetaTables query. No schema migration or CRM data mutation was
+needed. Eighteen focused API and documentation tests passed, including read
+authorization, read-only fields, null Company labels and collection envelopes.
+The frontend app and user-guide builds, documentation validation and strict
+MkDocs build passed.
+
+The running local API and Vite site were checked against existing hosted
+PostgreSQL MetaTables data. Twenty-five Lead labels matched fresh Contact
+reads, and the first Lead's detail matched its collection record. The browser
+showed Contact and Company columns and named detail links. At 375 × 812 the
+SDK stacked the same fields without page overflow; this was a viewport check,
+not the full coarse-pointer matrix. A pagination overlap check was affected
+by other actors adding Leads during verification: offset pages are not a
+snapshot. A follow-up read check passed with a stable Contact filter, including
+the empty second page and exact count. Read-check evidence is ignored under
+`.local/lead-display-verification/`.
+Deployed delivery remains unverified; no push was performed.
+
+## 2026-10-16 isolated real-agent pre-push verification
+
+The pre-push verifier now launches an owned private MetaTables runtime, asserts
+its SQLite file and runtime identity before initialization, and applies CRM
+revisions through the installed public migration client. It does not migrate
+the hosted database or alter another local runtime. The settings bootstrap
+read now uses the runtime-aware SQLAlchemy compiler rather than declaring
+PostgreSQL SQL against SQLite. Existing bootstrap contract tests exercise both
+dialects; permissions and query limits are unchanged.
+
+After reconnecting the real `openai-codex` credential, Tau 2.0.13 with the
+workflow's `gpt-5.6-luna` model and medium thinking passed actual CRM discovery,
+the persisted `crm_settings_get` read, process restart/history recovery, and an
+independent fresh API read. The private catalog reached `0011` with 27 bindings
+and protected CRM bootstrap returned `200`/ready. Evidence for this working-tree
+run is retained in ignored
+`.local/agent-pre-push/5709f771-55a5-47cb-a52f-1545d6c87cc5/report.json`.
+The hook must repeat the check on the clean committed revision at push.
+This SQLite settings check does not establish PostgreSQL Contact-query or
+browser correctness; hosted migration and page verification remain separate
+deployment checks.
+
+The subsequent normal push of clean commit `b95c020` did not publish: its hook
+failed at Tau startup because the backend hydration endpoint returned
+`409 model_provider_credential_unavailable` at 07:13:49 UTC, despite successful
+hydrations at 07:10:19, 07:10:23 and 07:10:46 UTC after credential reconnect.
+A standalone check of the same clean commit reproduced the 409 at 07:14:42 UTC.
+The backend's precise refresh/selection cause is not established; it is reported
+in [backend issue 995](https://github.com/Main-Sequence-Server-Side/tdag-django/issues/995).
+Evidence remains under ignored `.local/agent-pre-push/ea9a9941-21d4-4625-aa0b-080779df9bfc/`
+and `.local/agent-pre-push/1462dd12-6b60-418e-bb16-8f96608783df/`.
+No gate was bypassed, neither repository was pushed, and no hosted migration
+or deployment was run. The existing Contacts browser still reports the missing
+Prompt binding, so it is not verified ready. All 343 API tests, Ruff and strict
+MkDocs passed; the frontend's 23 tests, typecheck, combined app/help build,
+documentation validation and theme audit passed separately. These checks do
+not replace the failed live-provider gate or deployed page verification.
+
+On the follow-up after the backend fix was reported, the unscoped provider
+catalog selected a different Environment with an unauthenticated credential;
+the CRM checkout's SDK-resolved Environment reported its credential authenticated.
+The CRM verifier now resolves its Environment from the current Git checkout and
+passes it to Tau's supported local provider-Environment setting. It neither
+hard-codes a UID nor changes the provider/model or authentication checks.
+This corrects verifier scope; it does not prove the cause of the earlier
+credential lifecycle failure. The live gate must still pass before publishing.
+
+The corrected working-tree run passed with the workflow's real
+`openai-codex/gpt-5.6-luna/medium`, successful provider hydration before and
+after restart, real CRM MCP discovery/settings results, durable history and
+matching fresh API read. Its private catalog was `0011` with 27 bindings.
+Evidence: `.local/agent-pre-push/faa7ddd0-daea-4b47-8df1-b413a8d4ecc2/report.json`.
+Eight documentation/workflow tests, Ruff, strict MkDocs and diff checks passed.
+Publishing and hosted migration/page checks remain separate from this result.
+
+## 2026-10-16 deployment retry after temporary outage
+
+Commit `9eb6a29` passed the clean-commit live-agent hook and was pushed. Its
+workflow built the exact CRM image successfully, but migration run
+`637c060d-9bf7-4f61-acd5-1623981d90c5` failed when the hosted MetaTables
+`/runtime-context/` read returned `503 Caller authentication is unavailable`.
+The API and assistant deployments remained gated by the failed migration;
+the paired frontend was not published. These results do not establish the
+hosted schema revision or a successful Contacts page load.
+
+The operator identified [issue 1001](https://github.com/Main-Sequence-Server-Side/tdag-django/issues/1001)
+as a temporary service outage, not a confirmed platform code defect, and
+authorized a fresh commit and push after recovery. This retry changes no CRM
+behavior and bypasses no checks: the normal push hook must pass again, and
+the repository workflow must run `migrate-crm` before API and assistant
+deployment. Hosted migrations are not run manually. Retry success, frontend
+publication and browser verification remain unverified until observed.
+
+## 2026-10-16 contact Notes editor
+
+The paired frontend adds contact Notes creation and editing with Date and Body,
+defaulting the date/time to now in the browser's local timezone. Notes reuse
+the Agent Prompts rich Markdown editor and safe reader. The existing REST and
+MCP mutations were unchanged at this stage; MCP/schema descriptions explicitly
+document Markdown and contact attachment. This date/body-only stage needed no
+migration. The title extension below supersedes that schema status.
+
+Files changed for this feature:
+
+- API: `api/erp/crm/mcp_tools.py`, `src/erp/crm/models/notes.py`, `tests/erp/crm/integration/test_notes.py`,
+  `docs/crm/api/engagement.md`, `docs/crm/concepts/tasks-notes.md`, and this verification page.
+- Frontend: `src/Resources.tsx`, `src/erp/crm/prompts/RichMarkdownEditor.tsx`,
+  `src/notes/Notes.tsx`, `src/notes/NoteForm.tsx`, `src/notes/types.ts`,
+  `src/notes/notes.css`, `tests/notes.test.ts`, `tests/notes.browser.mjs`,
+  `docs/crm/contacts/index.md`, and `engineering/README.md`.
+
+The focused API/MCP/catalog/documentation suite passed 50 tests, including six
+new Notes cases. These exercise the real authenticated MCP protocol and REST
+service, with compiled governed SQL executing in a private disposable PostgreSQL
+cluster. Contact/Note fixtures are created, updated and read back; stale versions,
+forged authorship, invalid parents/dates, capability revocation and atomic audit
+rollback are checked. Database fixtures are rolled back and the owned cluster
+is stopped and removed. Network transport, directory and policy are test
+substitutes; this does not establish hosted authorization or persistence.
+
+Frontend unit tests passed (28 tests), and the isolated Notes and existing Agent
+Prompts browser suites passed. Notes checks include creation/editing, rendered
+Markdown, source fallback, draft/conflict recovery, committed-but-lost response
+handling, read-only capability presentation and the six SDK viewport sizes in
+light/dark themes with actual touch contexts. Typecheck, combined app/help build,
+documentation validation, theme audit, strict MkDocs and Ruff passed.
+The built-artifact browser check also passed the application gate, help home,
+21 guide links, desktop/mobile light/dark views and return navigation.
+
+The live `.venv/bin/python scripts/erp/crm/agent/verify_local_agent.py` attempt stopped before
+agent startup: Git context resolution returned `401 No auth configured` for the
+checkout's configured backend, `http://127.0.0.1:8000`. CLI auth status confirmed
+there was no usable session. Evidence is retained under ignored
+`.local/agent-pre-push/notes-2026-10-16-auth-unavailable/report.json`.
+Real-provider execution and fresh-process live catalog binding remain unverified.
+No hosted data was changed and this change was not pushed or deployed.
+
+## 2026-10-16 Note titles
+
+Notes now accept an optional plain-text title (up to 255 Unicode characters
+after trimming). The contact Notes editor, list and reader display it; older
+untitled notes display “Untitled note”. Search includes both title and body.
+REST and `crm_notes_create` / `crm_notes_update` share title validation;
+omission on update preserves the title and explicit null clears it.
+
+Files changed for this extension:
+
+- API: `src/erp/crm/models/notes.py`, `src/erp/crm/metatables/note.py`,
+  `src/erp/crm/repositories/resources/{reads,writes,catalog}.py`,
+  `src/crm/migrations/versions/mainsequence_crm/0012_add_note_title.py`,
+  `api/erp/crm/{discovery,mcp_tools}.py`, `tests/{test_notes,test_migrations}.py`,
+  and the Notes concept, engagement API, persistence and verification pages.
+- Frontend: `src/notes/{types.ts,NoteForm.tsx,Notes.tsx}`, `src/Resources.tsx`,
+  `tests/{notes.test.ts,notes.browser.mjs}`, `docs/crm/contacts/index.md` and
+  `engineering/README.md`.
+
+Executed checks:
+
+- `pytest tests/erp/crm/integration/test_notes.py tests/erp/crm/integration/test_migrations.py -q`: 19 passed. The
+  Notes cases exercise authenticated MCP and REST through real compiled SQL in
+  private PostgreSQL, with test transport/policy. They verify title creation,
+  trimming, editing, omission/clearing, search, Unicode bounds, stale fences,
+  capability denial and record/audit rollback. Owned fixtures are read back,
+  rolled back and the temporary cluster removed.
+- Full-history SQLite and PostgreSQL revision checks preserve legacy notes,
+  timestamps and versions. SQLite also checks old foreign keys/checks/indexes,
+  downgrade/re-upgrade, and a fresh interpreter reading the authored Note model.
+  An extra future PostgreSQL column does not leak into strict read responses or
+  mutation read-back. These are database checks, not platform catalog binding.
+- Resource collection, MCP, resource route and catalog regression checks passed
+  101 other cases; documentation and MCP skill publication checks passed 11.
+- Frontend unit tests passed (29). Notes browser checks passed with 92 isolated
+  requests, including title create/edit/clear, title search, source preservation,
+  conflict/uncertain saves, readonly behavior and all six SDK viewport sizes in
+  light/dark themes. An intermittent title update was addressed by capturing
+  input values before queued React state updates; subsequent browser passes
+  succeeded. Mobile title/editor screenshots were inspected.
+- Node 24 typecheck/app/help build, guide validation and theme audit passed.
+  The built-artifact browser check passed the application gate, help home,
+  21 guide links, desktop/mobile light/dark views and return navigation.
+  Ruff and strict MkDocs passed.
+
+Revision `0012` is authored and locally tested, not deployed. Its
+[compatibility-first rollout prerequisite](persistence.md#note-titles-revision-0012)
+must be satisfied before the workflow applies the new column. No hosted
+migration, push or deployment was performed. CLI auth status still reports no
+usable session for the configured backend, so real-provider local-agent and
+fresh-process live catalog verification remain unavailable, as recorded above.
+The local runtime probe (`metatables --local runtime status`) also returned
+`503 Current platform identity facts are unavailable` from loopback port 18473;
+no local platform migration/finalization was attempted without verified runtime
+identity.
+
+## Agent Prompt MCP reads (2026-10-23)
+
+The application MCP adds read-only `crm_prompts_list` and `crm_prompts_get` for
+saved Agent Prompts. The list uses existing bounded, metadata-only Prompt
+collections; detail returns the exact stored Markdown. Both reuse the REST
+service and effective-person `crm.read` authorization. They remain available
+with Solution Selling disabled and add no Prompt mutation or rendering tools.
+The five-skill pack assigns both reads to CRM core, and its paired repository
+copy is kept identical. No schema change, dependency update or migration
+revision is needed.
+
+Regression checks cover MCP/REST equality with literal Markdown, metadata-only
+search, paging bounds, read-only annotations, denied/spoofed requests and fresh
+permission revocation. Their private PostgreSQL transport and policy are test
+substitutes. The real-provider local gate and a hosted read of the saved
+“Linkedin Connection Outreach” document are separate release acceptance checks;
+a successful catalog listing alone does not prove the document can be read.
+
+## Keeping this site current
+
+A material change to a CRM model, business rule, mounted route, payload,
+authorization, persistence behavior, transfer lifecycle, or delivery status
+must update the relevant [concept](../concepts/index.md) and API/delivery page
+in the same change. Add new pages to `mkdocs.yml`, use relative links, and run
+the strict build. The repository's
+`maintain-crm-documentation` skill records this workflow for coding agents.
+
+
+## 2026-10-12 direct OAuth directory projection correction
+
+The deployed c838254 revision rejected a direct OAuth contact read as
+`nonhuman_caller`: human directory projections omit `identity_type`. MCP now
+requires a caller-scoped exact human filter match when that field is absent,
+with matching UID and active state. No CRM grants or operation checks changed.
+
+Focused hosted identity, MCP and documentation tests passed (34 tests); Ruff
+and strict MkDocs build passed. Regression cases cover omitted type, empty,
+duplicate, wrong-UID and inactive matches. Hosted OAuth verification and the
+hosted workload verification remain pending at this point. The real-provider
+local agent gate passed with CRM MCP reads, restart persistence and fresh API
+read-back; evidence is under `.local/agent-pre-push/953870f6-d8e2-4f87-8cee-6a344752c77c/report.json`.
+
+
+## 2026-11-10 selected email capture and thread refresh (local source)
+
+Uncommitted source based on `7feeee2` adds core stored-email history, explicit
+Gmail preview/import, owner-selected future-thread refresh, atomic follow-up
+linkage and migration `0014`. Search, connection and one-message import never
+implicitly enroll a thread or mailbox. Thread metadata is inspected before
+eligible new bodies are fetched, with scope/grant checks before reads and at
+commit. This is an authenticated reader/explicit refresh implementation; no
+unattended worker or broader mailbox synchronization is declared.
+
+The selected API/MCP/catalog/migration/documentation regression command passed
+79 tests. Eleven email cases execute actual compiled commands against private
+PostgreSQL 17, including final-audit rollback, duplicate prevention, account and
+selection fences, permission revocation, Task reuse, provider migration and
+fresh-interpreter persistence. Platform transport/directory/provider are fixtures;
+this is not evidence of live Google authorization or hosted database grants.
+The full provider history also passes on temporary SQLite. Strict MkDocs and
+mounted route-index checks passed. The paired frontend's fixture workflow,
+responsive SDK checks and same-artifact user-guide checks passed separately.
+
+Deploy through the existing migration Job, then verify fresh live catalog
+bindings and an owned disposable record against the actual Gmail/hosted caller
+path. No hosted migration, release, customer email import or push was performed.
+The real-provider local-agent pre-push gate remains required before publishing.
+See [email concepts](../concepts/emails.md), [API](../api/emails.md) and
+[ADR 0002](../google_workspace_module/adrs/0002-selected-email-history.md).
+
+## Lead identity search correction — 2026-11-11
+
+Read-only checks against the deployed CRM reproduced the reported behavior:
+`crm_leads_list(search="Eric")` returned eight unrelated Leads and omitted
+Eric Nguyen. Filtering by his Contact UID returned his existing Contacted Lead.
+The authored collection searched Lead notes, while the Contact and Company
+labels were joined only after filtering and paging. "Eric" therefore matched
+the substring in hidden wording such as "generic".
+
+The local correction searches the referenced Contact's full name and every
+email address plus the current primary Company name, before count/pagination.
+Notes are excluded. It retains case-insensitive literal substring matching,
+archive exclusion, explicit filters, authoritative totals and one governed SQL
+operation. No schema migration or record mutation is needed for this fix.
+
+`CRM_TEST_POSTGRES_DOCKER=1 .venv/bin/python -m pytest tests/erp/crm/integration/test_lead_search.py
+tests/erp/crm/integration/test_lead_display.py tests/erp/crm/integration/test_solution_selling.py -q --tb=short -x`
+passed 26 cases, including 15 new actual-PostgreSQL/HTTP cases for names, all
+emails, Companies, missing names/Companies, hidden-note false matches, literal
+wildcards, injection-like input, archives, filters and cross-page totals.
+The separate Lead/Solution Selling/shared-operation/MCP/documentation regression
+selection passed 38 cases. Strict MkDocs passed. Containers used random
+loopback ports, contained only synthetic records, and were removed afterwards.
+
+The paired frontend's Leads search box passed eight isolated browser requests;
+Node tests, TypeScript, the application/user-guide build, guide validation and
+theme audit also passed. These are local code and fixture checks. The live
+reads establish the deployed bug, not deployment of the correction. No push,
+release or customer record update was performed.
+
+## Shared email conversation ADR amendment — 2026-11-12
+
+[ADR 0002](../google_workspace_module/adrs/0002-selected-email-history.md) now
+records the user-accepted shared-conversation model: private owner-held Gmail
+authority, explicit historical message selection/publication, a clearly stated
+`crm.read` audience, saved Lead associations, separate source-thread enrollment,
+and independent mailbox attribution with no automatic cross-mailbox merging.
+The concepts and current local API reference distinguish that accepted target
+from the incomplete, unpublished implementation. Lead UI, multi-message import,
+association/query work and multi-user integration checks remain outstanding;
+private/team-only email audiences and an unattended worker are separate extensions.
+
+This is a documentation change. It implements no route, schema, permission,
+worker or email import and changes no live CRM record or deployment. Approval
+of the ADR does not itself select or publish customer correspondence. The ADR's
+acceptance criteria are requirements, not evidence of executed integration tests.
+For this amendment, `.venv/bin/mkdocs build --strict` passed,
+`.venv/bin/python -m pytest tests/erp/crm/documentation/test_documentation.py -q --tb=short` passed
+one route-reference test, and `git diff --check` passed in both repositories.
+Prior local email fixtures do not verify the amended workflow.
+
+## 2026-11-12 shared conversation implementation
+
+The local extension implements context-bound historical review/import (at most
+25 messages per page), explicit `EmailLeadLink`, shared-reader audience and
+owner-only future sync. REST and MCP share the same operations; the new public
+tools are `crm_gmail_conversation_preview` and `crm_gmail_conversation_import`.
+Owned PostgreSQL tests cover selected subsets, no-preview persistence, changes
+after review, page boundaries, missing/forged audiences, stale Leads, two
+mailbox owners, shared readers without mailbox access, denied counts/bodies,
+source deduplication and audit rollback. Contact-merge preservation is included.
+
+The isolated browser exercises Lead → Email conversations → Add, explicit
+historical selection and audience, sync controls, conflict recovery and Task
+follow-up. API strict documentation, frontend type/build/theme and same-artifact
+help checks passed locally. Release checkout checks, real-provider pre-push and
+actual rollout are still pending at this entry; these fixture results do not
+establish live Gmail import or deploy email records for Eric.
+
+
+## Lead identity search correction — 2026-11-12
+
+The deployed search matched Lead notes rather than the displayed Contact.
+Searching `Eric` returned unrelated Leads whose notes contained words such as
+"generic" and omitted Eric Nguyen, despite his existing Contacted Lead.
+
+Lead search now matches the Contact's full name, all email addresses and current
+primary Company name before counting and pagination. Notes are excluded.
+Matching remains a case-insensitive literal substring, with escaped wildcard
+characters, existing filters and archive exclusion. REST and MCP share this
+governed query. No schema migration or record mutation is needed.
+
+The regression suite executes the submitted HTTP search and compiled SQL on
+owned PostgreSQL, covering names, secondary email, company, unnamed and
+companyless Contacts, unrelated hidden notes, literal wildcards, filters,
+archive exclusion and authoritative pagination. The selected search, display,
+Solution Selling, documentation and bootstrap suites passed 33 tests against
+the isolated release tree. Ruff on the changed Python files and the strict
+MkDocs build passed. The paired frontend's existing search transport is
+unchanged. The real-provider pre-push gate and hosted deployment are checked
+separately; local tests alone do not establish live behavior.
+
+The correction was subsequently verified live on commit `b8b1f30`: the actual
+hosted Leads screen and MCP search for Eric returned Eric Nguyen and Eric Karobia.
+The API active revision was `7aaebbc1-a7be-415f-8020-a514f7c1b908`; the owner
+requested idle scale-down delay is 300 seconds. This email release preserves
+the search correction and its authoritative count/filter behavior.
+
+## Live rollout checkpoint — 12 November 2026
+
+API commit `1792c7aa83d5773d372cf163cbc934ada17fe18b` is deployed. Workflow
+`b7161b67-fe47-45e9-92d4-f61729a87b0f` succeeded for the migration Job, API
+and assistant. API active revision: `5c27c725-c293-443a-8523-bebb17c5fafd`;
+36 active MetaTable bindings at migration `0015`. The required real-provider
+pre-push gate passed with local Tau 2.0.26, openai-codex/gpt-5.6-luna, actual
+MCP reads, restart persistence and a fresh API read. The API retains its
+300-second idle scale-down delay, minimum zero and maximum ten replicas.
+
+Frontend commit `ac1be83a75148721138f360c1750e2add1654326` is deployed.
+Application code is unchanged from `28b5820620131df43751bd207be558c7839eb267`;
+the later commit publishes verified rollout evidence. Workflow
+`e7e0f084-0a13-473c-ba5a-84705dae93df` and static-site DeploymentRun
+`83a4f31d-3865-4f7f-8702-500aa7543968` both succeeded. Static-site active
+and desired revision: `69d51a42-e1d7-43c8-93af-171fd39cc79f`.
+
+The actual hosted browser passed Lead search for Eric Nguyen, his Email
+conversations tab, Add email conversation, the exact Lead context, resolved
+Contact label Eric Nguyen and an initially empty Gmail query. The Company
+resolved to Mobius Investments Ltd. Screenshots and the successful browser
+receipt are preserved under `.local/email-release-20261112/`. Startup was
+checked separately: bootstrap returned HTTP 200 in about 36.6 seconds in the
+traced session. The live checker allows the documented credential/bootstrap
+budget and waits for the asynchronous selected Contact label. No production
+behavior was changed to make these verification waits pass.
+
+The fresh live MCP catalog has 104 tools, including
+`crm_gmail_conversation_preview`, `crm_gmail_conversation_import`, saved-email
+reads and owner-controlled thread selection/refresh. Eric's Lead read returned
+zero saved messages; the Contact-filtered Interaction read also returned zero.
+The existing follow-up Task still contains only a Gmail URL in its text and
+has `source_email_message_uid=null`. This release did not import that message
+or create an email Interaction automatically.
+
+### GitHub checkout recovery
+
+Initial diagnosis incorrectly treated the stored platform key as missing:
+`list_deploy_keys` deliberately hides the system key. The raw GitHub list
+established that the key exists, its public/private pair matches, and SSH
+authenticates it, but all four repository deployment keys were disabled by
+MainSequenceCorp's `deploy_keys_enabled_for_repositories=false` setting.
+The approved single-key add request returned HTTP 200 without adding a key;
+the platform endpoint ignores a returned provider error, so 200 was not
+restoration proof. The earlier explanation was corrected.
+
+The user then explicitly approved enabling organization deployment keys. The
+one setting was changed to true through GitHub's official API; a fresh read
+confirmed the existing key is enabled and an exact platform SSH checkout
+succeeded. No private key/token was exported or rotated. The original delivery
+`bb3a9f38-deb5-11f1-8735-2bcc68b262a8` exhausted retries and was not replayed.
+The corrected report was published through the normal Git workflow; fresh
+delivery `97e37258-debf-11f1-9f07-05f9ea45c5b7` processed successfully and
+admitted the successful frontend deployment above. GitHub documents the policy
+at [Restricting deploy keys](https://docs.github.com/en/enterprise-cloud@latest/organizations/managing-organization-settings/restricting-deploy-keys-in-your-organization).
+
+### Verification limits
+
+Automatic approval review rejected creating a disposable Contact in Production
+because implementation/verification did not explicitly authorize production
+fixtures. No fixture was created. Mutation verification used disposable local
+PostgreSQL; live business reads stayed read-only. No actual Gmail message was
+read or imported, and a second real user's session was not exercised. The local
+API and browser suites cover selection, sharing, source-owner controls and
+transaction boundaries; they are not live Google-import evidence.

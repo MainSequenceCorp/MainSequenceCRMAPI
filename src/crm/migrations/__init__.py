@@ -4,7 +4,7 @@ from metatables.migrations import (
     build_alembic_version_metatable,
     build_metatable_migration_provider,
 )
-from src.crm.metatables import Base
+from src.erp.crm.metatables import Base
 from src.crm.migrations.registry import metatable_provider_models
 
 CodeRepositoryAlembicVersion = build_alembic_version_metatable(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from metatables.migrations import build_metatable_model_registry
-from src.crm.metatables import MODELS, Base
+from src.erp.crm.metatables import MODELS, Base
 
 
 def metatable_provider_models() -> list[type]:

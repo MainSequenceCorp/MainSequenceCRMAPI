@@ -1,1 +1,1 @@
-"""Main Sequence CRM API surface."""
+"""Compatibility namespace; CRM HTTP implementation lives in api.erp.crm."""

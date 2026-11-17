@@ -1,0 +1,188 @@
+"""One-request bootstrap and assistant runtime selection contract."""
+
+import json
+import uuid
+
+import anyio
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+
+from api.erp.crm.main import create_app
+from src.agents.crm.discovery import resolve_assistant
+from src.erp.crm.config import crm_config
+from src.erp.crm.models.bootstrap import Bootstrap
+
+ACTOR = uuid.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+PIPELINE = uuid.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+
+
+class ReadyRegistry:
+    def validate(self):
+        pass
+
+    def validate_settings(self):
+        pass
+
+
+class ReadyPolicy:
+    def capabilities(self, actor_uid):
+        assert actor_uid == ACTOR
+        return {"crm.read"}
+
+
+class ReadyDirectory:
+    def display_name(self, actor_uid):
+        return "Test user"
+
+    def is_selectable(self, actor_uid):
+        return True
+
+
+class ReadyBootstrap:
+    def validate(self, actor_uid):
+        pass
+
+    def read(self, actor_uid):
+        return {
+            "application_version": "0.1.0",
+            "current_user": {"uid": str(actor_uid), "display_name": "Test user", "selectable": True},
+            "capabilities": ["crm.read"],
+            "settings": {
+                "configuration_version": 1, "default_currency": "USD", "timezone": "UTC",
+                "company_sectors": [], "contact_statuses": [], "deal_categories": [], "task_types": [],
+            },
+            "default_pipeline_uid": str(PIPELINE),
+            "limits": {
+                "list_page_max": 100, "bulk_explicit_max": 200,
+                "upload_bytes_max": 20971520, "transfer_rows_max": 20000,
+            },
+            "modules": {"solution_selling": True, "google_workspace": True, "campaigns": True},
+        }
+
+
+def ready_client(caller):
+    app = create_app()
+    app.state.crm_registry = ReadyRegistry()
+    app.state.crm_policy = ReadyPolicy()
+    app.state.crm_directory = ReadyDirectory()
+    app.state.crm_bootstrap = ReadyBootstrap()
+    return TestClient(app, headers=caller(ACTOR))
+
+
+def test_persisted_extension_configuration_ignores_old_environment_switches(config_file, monkeypatch):
+    monkeypatch.setenv("INCLUDE_SOLUTION_SELLING", "false")
+    monkeypatch.setenv("INCLUDE_GOOGLE_WORKSPACE_EXTENSION", "false")
+    paths = create_app().openapi()["paths"]
+    assert "/extensions/solution-selling/leads/" in paths
+    assert "/extensions/google/oauth/callback/" in paths
+
+
+def test_invalid_persisted_configuration_fails_at_app_boot(config_file):
+    config_file(google_workspace=False)
+    from src.erp.crm.config import CONFIG_PATH
+
+    CONFIG_PATH.write_text("extensions:\n  solution_selling:\n    active: true\n", encoding="utf-8")
+    crm_config.cache_clear()
+    with pytest.raises(RuntimeError, match="config/erp/crm/settings.yaml"):
+        create_app()
+
+
+def test_bootstrap_serializes_readiness_and_unavailable_assistant(monkeypatch, signed_caller):
+    monkeypatch.setattr("api.erp.crm.main.resolve_assistant", lambda origin: _unavailable())
+    response = ready_client(signed_caller).get("/api/crm/v1/bootstrap/")
+    assert response.status_code == 200
+    payload = Bootstrap.model_validate(response.json())
+    assert payload.readiness.status.value == "ready"
+    assert payload.assistant.enabled is False
+
+
+async def _unavailable():
+    return {"enabled": False, "runtime": None, "agent_uid": None,
+            "environment_uid": None, "display_name": "CRM assistant"}
+
+
+def test_local_tau_precedes_platform_and_unready_tau_falls_back(monkeypatch):
+    import src.agents.crm.discovery as runtime
+
+    platform = {"enabled": True, "runtime": {"mode": "platform"},
+                "agent_uid": str(uuid.uuid4()), "environment_uid": str(uuid.uuid4()),
+                "display_name": "CRM assistant"}
+    calls = []
+    monkeypatch.setattr(runtime, "_platform_agent", lambda name: calls.append(name) or platform)
+
+    class TauClient:
+        ready = True
+
+        def __init__(self, **kwargs):
+            assert kwargs["trust_env"] is False
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def get(self, url):
+            assert url == "http://127.0.0.1:38642/ready"
+            return httpx.Response(200 if self.ready else 503, json={"ok": self.ready, "mode": "local"})
+
+    monkeypatch.setattr(runtime.httpx, "AsyncClient", TauClient)
+    local = anyio.run(resolve_assistant, "http://127.0.0.1:38642")
+    assert local["runtime"] == {"mode": "local", "base_path": "/tau"}
+    assert local["agent_uid"] is None and calls == []
+    TauClient.ready = False
+    fallback = anyio.run(resolve_assistant, "http://127.0.0.1:38642")
+    assert fallback == platform and calls == ["CRM assistant"]
+    assert anyio.run(resolve_assistant, None) == platform
+
+
+def test_invalid_card_disables_both_transports(monkeypatch, tmp_path):
+    import src.agents.crm.discovery as runtime
+
+    card = tmp_path / "agent_card.json"
+    card.write_text('{"name": "", "description": "No name"}', encoding="utf-8")
+    monkeypatch.setattr(runtime, "CARD_PATH", card)
+    monkeypatch.setattr(runtime, "_platform_agent", lambda name: pytest.fail("Platform lookup must not run"))
+    result = anyio.run(resolve_assistant, None)
+    assert result["enabled"] is False and result["display_name"] is None
+
+
+def test_platform_agent_accepts_a_read_without_runtime_update(monkeypatch):
+    """Platform Agent reads no longer carry `runtime_update`; SDK 9.0.30 required it."""
+    import mainsequence.code_repository_context as context
+    import src.agents.crm.discovery as runtime
+    from mainsequence.client.agent_runtime_models import Agent
+
+    card = json.loads(runtime.CARD_PATH.read_text(encoding="utf-8"))
+    agent_uid, environment_uid, branch_uid, release_uid = (str(uuid.uuid4()) for _ in range(4))
+    read = {
+        "uid": agent_uid,
+        "name": card["name"],
+        "description": card["description"],
+        "agent_card": card,
+        "llm_thinking": "medium",
+        "repository_branch": "main",
+        "organization_environment_uid": environment_uid,
+        "organization_environment_name": "Production",
+        "code_repository_branch_uid": branch_uid,
+        "runtime_release_uid": release_uid,
+    }
+    lookups = []
+
+    def platform_filter(cls, **filters):
+        lookups.append(filters)
+        return [cls.model_validate(read)]
+
+    monkeypatch.setattr(Agent, "filter", classmethod(platform_filter))
+    monkeypatch.setattr(context, "resolve_organization_environment_uid", lambda operation: environment_uid)
+    monkeypatch.setattr(context, "resolve_code_repository_branch_uid", lambda operation: branch_uid)
+
+    assert runtime._platform_agent(card["name"]) == {
+        "enabled": True,
+        "runtime": {"mode": "platform"},
+        "agent_uid": agent_uid,
+        "environment_uid": environment_uid,
+        "display_name": card["name"],
+    }
+    assert lookups == [{"name": card["name"]}]

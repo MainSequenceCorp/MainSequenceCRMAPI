@@ -1,6 +1,6 @@
 """Local MCP transport only; hosted application tools are supplied by Tau."""
 
-from api.tau.local_mcp import local_mcp_tools
+from src.agents.crm.local_mcp import local_mcp_tools
 
 
 def setup(tau) -> None:

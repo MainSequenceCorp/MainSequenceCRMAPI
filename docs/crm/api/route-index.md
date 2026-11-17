@@ -1,0 +1,184 @@
+# Mounted route index
+
+This is the exact core method/path inventory exposed by `api.erp.crm.main:app`.
+All three optional extensions are active in `config/erp/crm/settings.yaml`; their additional
+routes are described in [Solution Selling](solution-selling.md),
+[Google Workspace](google-workspace.md) and [Campaigns](campaigns.md). All optional extension API routes use
+`/extensions/<module>/`; core CRM routes use `/api/crm/v1/`. The grouped pages explain payloads and behavior. Updating a mounted route also
+requires updating this index; `tests/erp/crm/documentation/test_documentation.py` compares it with
+FastAPI's generated OpenAPI paths.
+
+| Method | Path | Reference |
+| --- | --- | --- |
+| `GET` | `/healthz` | [Service and settings](service.md) |
+| `GET` | `/api/crm/v1/readiness/` | [Service and settings](service.md) |
+| `GET` | `/api/crm/v1/bootstrap/` | [Service and settings](service.md) |
+| `GET` | `/api/crm/v1/prompts/discovery/` | [Prompts](prompts.md) |
+| `GET` | `/api/crm/v1/prompts/` | [Prompts](prompts.md) |
+| `POST` | `/api/crm/v1/prompts/` | [Prompts](prompts.md) |
+| `GET` | `/api/crm/v1/prompts/{uid}/` | [Prompts](prompts.md) |
+| `PATCH` | `/api/crm/v1/prompts/{uid}/` | [Prompts](prompts.md) |
+| `POST` | `/api/crm/v1/prompts/{uid}/archive/` | [Prompts](prompts.md) |
+| `POST` | `/api/crm/v1/prompts/{uid}/restore/` | [Prompts](prompts.md) |
+| `GET` | `/api/crm/v1/interactions/` | [Interactions](interactions.md) |
+| `POST` | `/api/crm/v1/interactions/` | [Interactions](interactions.md) |
+| `GET` | `/api/crm/v1/interactions/{uid}/` | [Interactions](interactions.md) |
+| `PATCH` | `/api/crm/v1/interactions/{uid}/` | [Interactions](interactions.md) |
+| `GET` | `/api/crm/v1/principals/` | [Service and settings](service.md) |
+| `GET` | `/api/crm/v1/settings/` | [Service and settings](service.md) |
+| `PATCH` | `/api/crm/v1/settings/` | [Service and settings](service.md) |
+| `GET` | `/api/crm/v1/pipelines/{uid}/stages/` | [Deals and pipelines](deals-pipelines.md) |
+| `GET` | `/api/crm/v1/pipelines/{uid}/board/` | [Deals and pipelines](deals-pipelines.md) |
+| `GET` | `/api/crm/v1/pipelines/{uid}/stages/{stage_uid}/cards/` | [Deals and pipelines](deals-pipelines.md) |
+| `POST` | `/api/crm/v1/deals/{uid}/move/` | [Deals and pipelines](deals-pipelines.md) |
+| `POST` | `/api/crm/v1/contacts/{uid}/merge/preview/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/contacts/{uid}/merge/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/contacts/{uid}/company-transition/` | [Contacts and companies](contacts-companies.md) |
+| `GET` | `/api/crm/v1/contacts/{uid}/affiliations/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/contacts/{uid}/affiliations/` | [Contacts and companies](contacts-companies.md) |
+| `GET` | `/api/crm/v1/contacts/{uid}/affiliations/{affiliation_uid}/` | [Contacts and companies](contacts-companies.md) |
+| `PATCH` | `/api/crm/v1/contacts/{uid}/affiliations/{affiliation_uid}/` | [Contacts and companies](contacts-companies.md) |
+| `GET` | `/api/crm/v1/companies/discovery/` | [Contacts and companies](contacts-companies.md) |
+| `GET` | `/api/crm/v1/companies/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/companies/` | [Contacts and companies](contacts-companies.md) |
+| `GET` | `/api/crm/v1/companies/{uid}/` | [Contacts and companies](contacts-companies.md) |
+| `PATCH` | `/api/crm/v1/companies/{uid}/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/companies/{uid}/archive/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/companies/{uid}/restore/` | [Contacts and companies](contacts-companies.md) |
+| `GET` | `/api/crm/v1/contacts/discovery/` | [Contacts and companies](contacts-companies.md) |
+| `GET` | `/api/crm/v1/contacts/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/contacts/` | [Contacts and companies](contacts-companies.md) |
+| `GET` | `/api/crm/v1/contacts/{uid}/` | [Contacts and companies](contacts-companies.md) |
+| `PATCH` | `/api/crm/v1/contacts/{uid}/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/contacts/{uid}/archive/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/contacts/{uid}/restore/` | [Contacts and companies](contacts-companies.md) |
+| `GET` | `/api/crm/v1/deals/discovery/` | [Deals and pipelines](deals-pipelines.md) |
+| `GET` | `/api/crm/v1/deals/` | [Deals and pipelines](deals-pipelines.md) |
+| `POST` | `/api/crm/v1/deals/` | [Deals and pipelines](deals-pipelines.md) |
+| `GET` | `/api/crm/v1/deals/{uid}/` | [Deals and pipelines](deals-pipelines.md) |
+| `PATCH` | `/api/crm/v1/deals/{uid}/` | [Deals and pipelines](deals-pipelines.md) |
+| `POST` | `/api/crm/v1/deals/{uid}/archive/` | [Deals and pipelines](deals-pipelines.md) |
+| `POST` | `/api/crm/v1/deals/{uid}/restore/` | [Deals and pipelines](deals-pipelines.md) |
+| `GET` | `/api/crm/v1/tasks/discovery/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/tasks/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `POST` | `/api/crm/v1/tasks/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/tasks/{uid}/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `PATCH` | `/api/crm/v1/tasks/{uid}/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `POST` | `/api/crm/v1/tasks/{uid}/archive/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `POST` | `/api/crm/v1/tasks/{uid}/complete/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `POST` | `/api/crm/v1/tasks/{uid}/reopen/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/notes/discovery/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/notes/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `POST` | `/api/crm/v1/notes/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/notes/{uid}/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `PATCH` | `/api/crm/v1/notes/{uid}/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `POST` | `/api/crm/v1/notes/{uid}/archive/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `POST` | `/api/crm/v1/notes/{uid}/restore/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/tags/discovery/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/tags/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `POST` | `/api/crm/v1/tags/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/tags/{uid}/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `PATCH` | `/api/crm/v1/tags/{uid}/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `POST` | `/api/crm/v1/tags/{uid}/archive/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `POST` | `/api/crm/v1/tags/{uid}/restore/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/activity/discovery/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/activity/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/activity/{uid}/` | [Tasks, notes, tags, and activity](engagement.md) |
+| `GET` | `/api/crm/v1/pipelines/` | [Deals and pipelines](deals-pipelines.md) |
+| `GET` | `/api/crm/v1/source-connections/` | [Imports and transfers](transfers.md) |
+| `POST` | `/api/crm/v1/source-connections/` | [Imports and transfers](transfers.md) |
+| `GET` | `/api/crm/v1/transfers/discovery/` | [Imports and transfers](transfers.md) |
+| `GET` | `/api/crm/v1/transfers/` | [Imports and transfers](transfers.md) |
+| `POST` | `/api/crm/v1/imports/` | [Imports and transfers](transfers.md) |
+| `POST` | `/api/crm/v1/imports/{uid}/file/` | [Imports and transfers](transfers.md) |
+| `PUT` | `/api/crm/v1/imports/{uid}/mapping/` | [Imports and transfers](transfers.md) |
+| `POST` | `/api/crm/v1/imports/{uid}/validate/` | [Imports and transfers](transfers.md) |
+| `GET` | `/api/crm/v1/imports/{uid}/plan/` | [Imports and transfers](transfers.md) |
+| `POST` | `/api/crm/v1/imports/{uid}/commit/` | [Imports and transfers](transfers.md) |
+| `GET` | `/api/crm/v1/transfers/{uid}/` | [Imports and transfers](transfers.md) |
+| `GET` | `/api/crm/v1/transfers/{uid}/issues/` | [Imports and transfers](transfers.md) |
+| `GET` | `/api/crm/v1/transfers/{uid}/errors.csv` | [Imports and transfers](transfers.md) |
+| `POST` | `/api/crm/v1/transfers/{uid}/cancel/` | [Imports and transfers](transfers.md) |
+| `POST` | `/api/crm/v1/transfers/{uid}/retry/` | [Imports and transfers](transfers.md) |
+
+## Optional extension routes enabled in this configuration
+
+| Method | Path | Reference |
+| --- | --- | --- |
+| `POST` | `/extensions/google/oauth/start/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/google/oauth/callback/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/google/oauth/done/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/google/oauth/attempts/{uid}/` | [Google Workspace](google-workspace.md) |
+| `POST` | `/extensions/google/oauth/complete/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/google/connections/` | [Google Workspace](google-workspace.md) |
+| `POST` | `/extensions/google/connections/{uid}/disconnect/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/google/calendars/` | [Google Workspace](google-workspace.md) |
+| `POST` | `/extensions/google/preview/` | [Google Workspace](google-workspace.md) |
+| `POST` | `/extensions/google/imports/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/solution-selling/assessments/` | [Solution Selling](solution-selling.md) |
+| `POST` | `/extensions/solution-selling/assessments/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/solution-selling/assessments/{uid}/` | [Solution Selling](solution-selling.md) |
+| `PATCH` | `/extensions/solution-selling/assessments/{uid}/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/solution-selling/diagnoses/` | [Solution Selling](solution-selling.md) |
+| `POST` | `/extensions/solution-selling/diagnoses/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/solution-selling/diagnoses/{uid}/` | [Solution Selling](solution-selling.md) |
+| `PATCH` | `/extensions/solution-selling/diagnoses/{uid}/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/solution-selling/prospecting-profiles/` | [Solution Selling](solution-selling.md) |
+| `POST` | `/extensions/solution-selling/prospecting-profiles/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/solution-selling/prospecting-profiles/{uid}/` | [Solution Selling](solution-selling.md) |
+| `PATCH` | `/extensions/solution-selling/prospecting-profiles/{uid}/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/solution-selling/leads/` | [Solution Selling](solution-selling.md) |
+| `POST` | `/extensions/solution-selling/leads/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/solution-selling/leads/{uid}/` | [Solution Selling](solution-selling.md) |
+| `PATCH` | `/extensions/solution-selling/leads/{uid}/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/solution-selling/prompters/` | [Solution Selling](solution-selling.md) |
+| `POST` | `/extensions/solution-selling/prompters/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/solution-selling/prompters/discovery/` | [Solution Selling](solution-selling.md) |
+| `POST` | `/extensions/solution-selling/prompters/bulk-delete/preflight/` | [Solution Selling](solution-selling.md) |
+| `POST` | `/extensions/solution-selling/prompters/bulk-delete/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/solution-selling/prompters/{uid}/` | [Solution Selling](solution-selling.md) |
+| `PATCH` | `/extensions/solution-selling/prompters/{uid}/` | [Solution Selling](solution-selling.md) |
+| `POST` | `/extensions/solution-selling/prompters/{uid}/render/` | [Solution Selling](solution-selling.md) |
+| `POST` | `/extensions/solution-selling/prompters/{uid}/validate/` | [Solution Selling](solution-selling.md) |
+
+| `POST` | `/extensions/solution-selling/context/` | [Solution Selling](solution-selling.md) |
+| `POST` | `/extensions/solution-selling/diagnoses/prepare/` | [Solution Selling](solution-selling.md) |
+| `GET` | `/extensions/campaigns/campaigns/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/campaigns/` | [Campaigns](campaigns.md) |
+| `GET` | `/extensions/campaigns/campaigns/{uid}/` | [Campaigns](campaigns.md) |
+| `PATCH` | `/extensions/campaigns/campaigns/{uid}/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/campaigns/{uid}/archive/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/campaigns/{uid}/restore/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/campaigns/{uid}/graph/validate/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/campaigns/{uid}/graph/` | [Campaigns](campaigns.md) |
+| `GET` | `/extensions/campaigns/prompts/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/prompts/` | [Campaigns](campaigns.md) |
+| `GET` | `/extensions/campaigns/prompts/{uid}/` | [Campaigns](campaigns.md) |
+| `PATCH` | `/extensions/campaigns/prompts/{uid}/` | [Campaigns](campaigns.md) |
+| `GET` | `/extensions/campaigns/participants/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/participants/` | [Campaigns](campaigns.md) |
+| `GET` | `/extensions/campaigns/participants/{uid}/` | [Campaigns](campaigns.md) |
+| `PATCH` | `/extensions/campaigns/participants/{uid}/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/tasks/prepare/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/tasks/advance/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/tasks/complete/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/tasks/wait/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/tasks/block/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/tasks/report/` | [Campaigns](campaigns.md) |
+| `POST` | `/extensions/campaigns/tasks/reconcile/` | [Campaigns](campaigns.md) |
+
+Export creation and download routes are not mounted and therefore do not
+appear here.
+| `GET` | `/api/crm/v1/email-messages/discovery/` | [Emails](emails.md) |
+| `GET` | `/api/crm/v1/email-messages/` | [Emails](emails.md) |
+| `POST` | `/api/crm/v1/email-messages/` | [Emails](emails.md) |
+| `GET` | `/api/crm/v1/email-messages/{uid}/` | [Emails](emails.md) |
+| `POST` | `/api/crm/v1/email-messages/{uid}/follow-up/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-search/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-conversation-previews/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-conversation-imports/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-previews/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-imports/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-threads/{uid}/selection/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-threads/{uid}/sync/` | [Emails](emails.md) |
+| `POST` | `/extensions/google/email-sync/` | [Emails](emails.md) |

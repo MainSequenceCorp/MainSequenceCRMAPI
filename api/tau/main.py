@@ -1,8 +1,5 @@
-"""Thin ASGI entrypoint for the optional Tau runtime.
+"""Compatibility entrypoint for the existing CRM assistant."""
 
-The deployer selects tool sources through Tau process settings.
-"""
+from api.agents.crm.main import app
 
-from ms_tau_sdk import create_app
-
-app = create_app()
+__all__ = ["app"]

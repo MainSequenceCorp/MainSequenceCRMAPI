@@ -36,7 +36,7 @@ resources:
     spec:
       name: CRM migrations
       description: Applies the CRM MetaTables migrations before the CRM API and assistant roll out.
-      execution_path: jobs/erp/crm/migrate.py
+      execution_path: jobs/migrate_crm.py
       cpu_request: "0.5"
       memory_request: "1"
       max_runtime_seconds: 1800

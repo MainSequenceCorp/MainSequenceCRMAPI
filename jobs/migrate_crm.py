@@ -1,9 +1,11 @@
 """Compatibility launcher for the CRM migration Job."""
 
-def main() -> None:
-    from jobs.erp.crm.migrate import main as migrate
+import runpy
 
-    migrate()
+
+def main() -> None:
+    runpy.run_module("jobs.erp.crm.migrate", run_name="__main__")
+
 
 if __name__ == "__main__":
     main()

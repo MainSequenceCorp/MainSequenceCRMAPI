@@ -1,0 +1,12 @@
+site_name: Sales API
+site_description: Independently owned Sales contracts and local delivery
+site_url: http://localhost/
+docs_dir: ../../docs/sales
+site_dir: ../../site/sales
+theme:
+  name: mkdocs
+nav:
+  - Overview: index.md
+  - Concepts: concepts.md
+  - API: api.md
+  - Local delivery: delivery.md

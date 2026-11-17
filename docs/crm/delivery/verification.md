@@ -2519,3 +2519,21 @@ now uses MetaTables 0.1.67 and its current membership contract directly, with no
 legacy fallback. A read-only hosted check validated all 36 table bindings and
 the initialized singleton settings row at revision `0015`. Complete local suite,
 real-provider agent and exact-commit deployment evidence is reported separately.
+
+## Main Sequence and Tau SDK refresh (2026-11-17, local)
+
+The user-requested update installs Main Sequence 9.0.40 and ms-tau-sdk 3.0.2,
+refreshes their managed skills and the authenticated platform skills, and
+regenerates the lockfile and hosted requirements. MetaTables remains 0.1.67.
+The current Agent contract supports several domain Agents per repository
+branch through distinct resource keys, cards and explicit runtime-resource
+selection. This change does not add or deploy another Agent.
+
+All 423 CRM tests passed with no skips using disposable PostgreSQL/SQLite
+fixtures. Strict MkDocs and the ASGI identity import passed. The actual local
+Tau 3.0.2 check passed using the workflow's real provider/model, CRM MCP reads,
+restart history and fresh API read-back against private local data at revision
+0015 with 36 bindings. Evidence is under
+`.local/agent-pre-push/6da7f469-4eb8-41f7-bdec-dd42d9cfb012/`.
+These dependency updates remain local; the earlier relocation rollout is a
+separate release and is not evidence that these SDK versions are hosted.

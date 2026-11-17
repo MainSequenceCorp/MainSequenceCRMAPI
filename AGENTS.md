@@ -1,5 +1,14 @@
 # Repository instructions
 
+Module development, mutation tests and first deployments must use verified
+MetaTables local mode (ready SQLite runtime and expected local DataSource).
+Platform deployment requires explicit user approval after local verification.
+Do not push commits/tags or reconcile workflows that can deploy before approval.
+Local commits do not authorize deployment. ERP Base is the first expansion module;
+CRM extraction is a separate later step. Each module owns its models and
+migration history and follows ADR, development, testing, deployment and frontend
+integration. Module API ADRs exclude new Agent and MCP work.
+
 Maintain each business domain independently. CRM work in `src/erp/crm/`,
 `api/erp/crm/`, `src/agents/crm/`, `api/agents/crm/`, `tests/erp/crm/`,
 `docs/crm/`, `documentation/crm/`, `engineering/crm/`, `scripts/erp/crm/`,

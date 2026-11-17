@@ -15,7 +15,7 @@ dependencies = [
   "jinja2>=3.1.6,<4",
   "mainsequence[mcp]>=9.0.31,<10",
   "mainsequence-metatable>=0.1.67,<0.2",
-  "ms-tau-sdk==2.0.26",
+  "ms-tau-sdk==3.0.2",
   "mcp>=2.3,<3",
   "pydantic[email]>=2.13,<3",
   "PyYAML>=6,<7",
@@ -94,4 +94,4 @@ dev = [
 testpaths = ["tests/erp/crm"]
 
 [tool.uv.sources]
-ms-tau-sdk = { git = "https://github.com/mainsequence-sdk/ms-tau-sdk.git", rev = "v2.0.26" }
+ms-tau-sdk = { git = "https://github.com/mainsequence-sdk/ms-tau-sdk.git", rev = "v3.0.2" }

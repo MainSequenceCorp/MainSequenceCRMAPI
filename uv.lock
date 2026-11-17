@@ -793,7 +793,7 @@ wheels = [
 
 [[package]]
 name = "mainsequence"
-version = "9.0.33"
+version = "9.0.40"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -816,9 +816,9 @@ dependencies = [
     { name = "typer" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e7/4c/aaac144586c642b92d68e5babdb17e4600db2a8709466d77d5d9c9d55f31/mainsequence-9.0.33.tar.gz", hash = "sha256:53cf13a0f1109785cfe0c9f852fdc67aeac1c45d640be03c99f7bf8ae2f374d3", size = 398475, upload-time = "2026-10-25T07:16:46.763Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/45/cdd014eff455e3efa36c2c73b16fd6eea8fdde330eb1869cdf63eb38be9a/mainsequence-9.0.40.tar.gz", hash = "sha256:934ca09e4588085bc6265f24b7e0fe103c258c75d161927fb73d5faaebb0dc9c", size = 431154, upload-time = "2026-11-10T18:12:22.409Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/e2/c34516b2340d808be7029ed284f59a7dc2fd48d5f67c90733b0b290b8935/mainsequence-9.0.33-py3-none-any.whl", hash = "sha256:9fad87aba5d288ec5e07c7eec069296149196c347942fd0ae789b9a243aebd21", size = 316508, upload-time = "2026-10-25T07:16:44.914Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/05/7ed621b7db58f6800ec1ca0709564770fecb5e685892b963444337c01bc5/mainsequence-9.0.40-py3-none-any.whl", hash = "sha256:b4217a879a9b226bf0f15e1c0602bae2955cfd3f303c6366e9eb748c18b6f897", size = 339180, upload-time = "2026-11-10T18:12:20.754Z" },
 ]
 
 [package.optional-dependencies]
@@ -904,7 +904,7 @@ requires-dist = [
     { name = "mainsequence", extras = ["mcp"], specifier = ">=9.0.31,<10" },
     { name = "mainsequence-metatable", specifier = ">=0.1.67,<0.2" },
     { name = "mcp", specifier = ">=2.3,<3" },
-    { name = "ms-tau-sdk", git = "https://github.com/mainsequence-sdk/ms-tau-sdk.git?rev=v2.0.26" },
+    { name = "ms-tau-sdk", git = "https://github.com/mainsequence-sdk/ms-tau-sdk.git?rev=v3.0.2" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.13,<3" },
     { name = "pyjwt", specifier = ">=2.10,<3" },
     { name = "pyyaml", specifier = ">=6,<7" },
@@ -1239,8 +1239,8 @@ wheels = [
 
 [[package]]
 name = "ms-tau-sdk"
-version = "2.0.26"
-source = { git = "https://github.com/mainsequence-sdk/ms-tau-sdk.git?rev=v2.0.26#9d197d28ec1d4d47922c688718fe626b8856d5d8" }
+version = "3.0.2"
+source = { git = "https://github.com/mainsequence-sdk/ms-tau-sdk.git?rev=v3.0.2#92e31d518a5ce3d4b1a9a62113af53b82cb59966" }
 dependencies = [
     { name = "anyio" },
     { name = "certifi" },
@@ -1250,6 +1250,7 @@ dependencies = [
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "mcp" },
+    { name = "opentelemetry-api" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyjwt", extra = ["crypto"] },

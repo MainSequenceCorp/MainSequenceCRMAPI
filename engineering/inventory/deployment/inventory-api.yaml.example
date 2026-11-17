@@ -1,0 +1,51 @@
+# Inert candidate: outside .mainsequence/workflows. Not platform-validated or approved.
+# Validate target branch and access, then obtain user approval before activation.
+api_version: "3.0.0"
+name: inventory-api
+resources:
+  - key: inventory
+    kind: fastapi
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      source_path: api/erp/inventory/main.py
+      mcp_enabled: false
+      cpu_request: "0.5"
+      memory_request: 1Gi
+      spot: false
+      automatic_deployment: true
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-inventory$'
+      revision_retention_count: 3
+  - key: migrate-inventory
+    kind: job
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      name: Inventory migrations
+      description: Apply only Inventory migrations before Inventory API activation.
+      execution_path: jobs/erp/inventory/migrate.py
+      cpu_request: "0.5"
+      memory_request: "1"
+      max_runtime_seconds: 1800
+      spot: false
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-inventory$'
+execution:
+  steps:
+    image:
+      prepare_image: inventory
+    migrate:
+      run_job: migrate-inventory
+      image_from: image
+      needs: [image]
+    deploy_api:
+      deploy: inventory
+      image_from: image
+      needs: [migrate]

@@ -32,3 +32,19 @@ remains, conservatively preventing order cancellation. Source identities, quanti
 prices and descriptions stay fixed; Finance controls tax/due date/reference/notes.
 Sales supplies its own authorized version-fenced statements; Finance imports no
 Sales table models. Both stores must resolve the same exact DataSource.
+
+## Inventory valuation extension (locally verified)
+
+Finance owns a service plan for explicit Inventory handoff. Completed external stock
+movements join their version fence/marker with two balanced inventory/stock-clearing
+postings and Finance audit in one same-source transaction. Finance post capability
+and active company currency are required. Duplicate movements cannot post again.
+Returns create opposite postings for their own UID atomically with Inventory return.
+Internal transfers are excluded. Zero-cost movements retain two zero-value rows.
+No foreign model writes or migration ownership moved to Inventory.
+
+Read-only GET /api/finance/v1/inventory-valuations/ returns a paged list of inventory
+legs; GET /api/finance/v1/inventory-valuations/{movement_uid}/ returns the balanced
+pair. Both require Finance read. The write plan is a public Python owner contract,
+not an endpoint accepting arbitrary client amounts. Companion Inventory detail
+consumes the owner read through its optional adapter. No statutory GL is implied.

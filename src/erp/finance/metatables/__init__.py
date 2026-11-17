@@ -231,7 +231,7 @@ class Allocation(Owned, PlatformManagedMetaTable, Base):
 class Posting(Owned, PlatformManagedMetaTable, Base):
     __tablename__ = "erp_finance__posting"
     __metatable_identifier__ = "erp_finance.posting"
-    __metatable_description__ = "One immutable signed debit-positive/credit-negative subledger entry in a balanced invoice/payment posting or its explicit reversal, with company/currency trace."
+    __metatable_description__ = "One immutable signed debit-positive/credit-negative subledger entry in a balanced invoice/payment or inventory valuation posting or its explicit reversal, with company/currency trace."
     __table_args__ = (
         UniqueConstraint(
             "resource", "record_uid", "phase", "account_role", name="uq_finance_posting_role"
@@ -239,9 +239,9 @@ class Posting(Owned, PlatformManagedMetaTable, Base):
         CheckConstraint("phase IN ('post','void')", name="ck_finance_posting_phase"),
     )
     resource: Mapped[str] = field(
-        "Document type", "Invoices or payments owner collection.", String(16)
+        "Document type", "Invoices, payments or the inventory valuation source.", String(16)
     )
-    record_uid: Mapped[UUID] = field("Document", "Finance document identifier.", Uuid(), index=True)
+    record_uid: Mapped[UUID] = field("Document", "Finance document or source stock movement identifier.", Uuid(), index=True)
     operating_company_uid: Mapped[UUID] = field(
         "Company", "Base company identifier copied from the document.", Uuid()
     )

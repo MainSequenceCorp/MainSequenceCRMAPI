@@ -1,0 +1,9 @@
+site_name: Inventory API
+site_url: http://127.0.0.1/docs/inventory/
+docs_dir: ../../docs/inventory
+site_dir: ../../.local/docs/inventory
+nav:
+  - Overview: index.md
+  - Concepts: concepts.md
+  - API: api.md
+  - Local operations: delivery.md

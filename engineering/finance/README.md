@@ -3,7 +3,7 @@
 The bounded Finance release is implemented and locally verified on 17 November
 2026. Review → API ADR → development/docs → tests/evidence → local deployment/ops
 → companion frontend/help verification is complete. Platform release and hosted
-integration remain unapproved. Projects and services is next in the local sequence.
+integration remain unapproved. Later local extensions are recorded below.
 
 - [OpenERP functionality mapping](openerp-coverage.md)
 - [API ADR](adr/0001-finance-api.md)
@@ -23,3 +23,12 @@ single ERP/help artifact. Evidence: 504 backend regressions pass; real business
 browser flow, six viewports/two themes, uncertain-write recovery, older allocation
 history, readiness recovery, combined build, unit checks and 50-guide navigation
 all pass. No platform release, hosted migration, push or tag was performed.
+
+Inventory ADR 0001 selects the Finance-owned valuation extension in
+[Finance ADR 0002](adr/0002-inventory-valuation.md). Its public posting plan and
+read contracts are locally verified, including permission/duplicate refusal, zero
+values and atomic compensating return. Metadata refresh used the existing Finance
+provider; no revision was rewritten. The 536-test ERP regression and actual stock/
+Finance browser flow pass; [Inventory evidence](../inventory/verification.md) records
+execution and remaining hosted gates. No new Finance user-navigation group is needed:
+the selected workflow reviews these entries in the companion Inventory detail.

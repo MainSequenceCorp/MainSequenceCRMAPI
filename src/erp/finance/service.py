@@ -653,3 +653,94 @@ class Service:
         uid, statements = self.plan_from_sales(payload)
         self.transact(statements)
         return self.get("invoices", uid)
+
+    @exact
+    def plan_inventory_valuation(self, move_uid, company_uid, currency_uid, amount):
+        """Owner-authored statements; caller joins its Inventory version fence atomically.
+
+        No HTTP mutation exposes arbitrary source amounts. Inventory derives them
+        from immutable completed stock entries and executes the complete plan.
+        """
+        import re
+
+        self.require("finance.post")
+        if not isinstance(amount, str) or not re.fullmatch(
+            r"-?(?:0|[1-9][0-9]{0,47})(?:\.[0-9]{1,6})?", amount
+        ):
+            raise FinanceError(
+                422, "amount", "Inventory valuation requires an exact bounded decimal string"
+            )
+        company = self.dependencies.base.get("operating-companies", company_uid)
+        currency = self.dependencies.base.get("currencies", currency_uid)
+        if (
+            company.get("archived_at")
+            or currency.get("archived_at")
+            or str(company["currency_uid"]) != str(currency_uid)
+        ):
+            raise FinanceError(
+                422,
+                "company_currency",
+                "Inventory valuation requires the active company's currency",
+            )
+        value = Decimal(amount)
+        value = self.quantize(
+            value,
+            {"minor_units": currency["minor_units"], "rounding": currency["rounding"]},
+            strict=True,
+        )
+        entries = [
+            {
+                "uid": uuid4(),
+                "resource": "inventory",
+                "record_uid": UUID(str(move_uid)),
+                "operating_company_uid": UUID(str(company_uid)),
+                "currency_uid": UUID(str(currency_uid)),
+                "phase": "post",
+                "account_role": role,
+                "amount": format(signed, "f"),
+                "occurred_at": now(),
+            }
+            for role, signed in [("inventory", value), ("stock_clearing", -value)]
+        ]
+        return [
+            insert(Posting).values(entries),
+            self.audit("inventory", move_uid, "stock_valuation", 1, ["postings"]),
+        ]
+
+    def inventory_valuation(self, move_uid):
+        self.require("finance.read")
+        rows = self.store.read(
+            select(Posting.__table__)
+            .where(Posting.resource == "inventory", Posting.record_uid == UUID(str(move_uid)))
+            .order_by(Posting.account_role)
+        )
+        if not rows:
+            raise FinanceError(404, "not_found", "Inventory valuation not found")
+        return {"items": rows}
+
+    def inventory_valuations(self, *, page_index=0, page_size=25):
+        self.require("finance.read")
+        terms = [Posting.resource == "inventory", Posting.account_role == "inventory"]
+        total = int(
+            self.store.read(select(func.count().label("count")).select_from(Posting).where(*terms))[
+                0
+            ]["count"]
+        )
+        rows = self.store.read(
+            select(Posting.__table__)
+            .where(*terms)
+            .order_by(Posting.occurred_at.desc(), Posting.uid)
+            .offset(page_index * page_size)
+            .limit(page_size),
+            max_rows=page_size,
+        )
+        return {
+            "items": rows,
+            "pageInfo": {
+                "pageIndex": page_index,
+                "pageSize": page_size,
+                "totalItems": total,
+                "hasNextPage": (page_index + 1) * page_size < total,
+                "hasPreviousPage": page_index > 0,
+            },
+        }

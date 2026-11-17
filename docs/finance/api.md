@@ -50,3 +50,19 @@ and complete owner-authored guarded statements. It retains Finance validation/au
 and the Sales owner link plan; same-source callers commit the entire plan with their
 own guard. Existing `from_sales` executes that plan and returns the saved invoice.
 No schema or HTTP behavior changes. A failed caller guard rolls all owners back.
+
+## Inventory valuation extension (locally verified)
+
+Finance owns a service plan for explicit Inventory handoff. Completed external stock
+movements join their version fence/marker with two balanced inventory/stock-clearing
+postings and Finance audit in one same-source transaction. Finance post capability
+and active company currency are required. Duplicate movements cannot post again.
+Returns create opposite postings for their own UID atomically with Inventory return.
+Internal transfers are excluded. Zero-cost movements retain two zero-value rows.
+No foreign model writes or migration ownership moved to Inventory.
+
+Read-only GET /api/finance/v1/inventory-valuations/ returns a paged list of inventory
+legs; GET /api/finance/v1/inventory-valuations/{movement_uid}/ returns the balanced
+pair. Both require Finance read. The write plan is a public Python owner contract,
+not an endpoint accepting arbitrary client amounts. Companion Inventory detail
+consumes the owner read through its optional adapter. No statutory GL is implied.

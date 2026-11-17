@@ -196,6 +196,16 @@ def create_app(*, enabled=True, local=False):
                 )
             }
 
+        @app.get(PREFIX + "/inventory-valuations/")
+        def inventory_valuations(
+            page_index: int = Query(0, ge=0, le=100000), page_size: int = Query(25, ge=1, le=100)
+        ):
+            return service().inventory_valuations(page_index=page_index, page_size=page_size)
+
+        @app.get(PREFIX + "/inventory-valuations/{uid}/")
+        def inventory_valuation(uid: UUID):
+            return service().inventory_valuation(uid)
+
         def mount(resource, create_schema, update_schema):
             prefix = PREFIX + "/" + resource
 

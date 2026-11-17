@@ -12,7 +12,7 @@ Revision 0001 creates only Finance's six tables and separate version table.
 It was reviewed and formatted before application. No application startup migration
 is allowed. The local wrapper verifies runtime/source, loopback origin and SDK
 sign-in; hosted deployment must use `api/erp/finance/main.py`, never `local.py`.
-Readiness must report local true, revision 0001 and matching Finance/Base sources.
+Readiness must report local true, revision 0002 and matching Finance/Base sources.
 `FINANCE_SALES_ENABLED=false` disables the optional link without removing standalone
 Finance. Source conversion also needs already applied Sales/Catalog foundations.
 
@@ -35,3 +35,8 @@ forward migration for recovery. Business-write uncertainty requires a fresh GET,
 not replay. Disablement preserves tables. Platform deployment requires explicit
 user approval after local verification; no push, release tag, active workflow,
 hosted migration or reconciliation is currently authorized.
+
+Purchasing integration adds Finance-owned revision 0002: nullable unique purchase
+order source on Invoice. Existing revision 0001 is unchanged. Restart local Finance
+and its consumers after this additive migration; the verified Purchasing cycle uses
+the same Local SQLite source. Hosted application remains separately approval-gated.

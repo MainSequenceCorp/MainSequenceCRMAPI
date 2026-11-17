@@ -32,3 +32,8 @@ provider; no revision was rewritten. The 536-test ERP regression and actual stoc
 Finance browser flow pass; [Inventory evidence](../inventory/verification.md) records
 execution and remaining hosted gates. No new Finance user-navigation group is needed:
 the selected workflow reviews these entries in the companion Inventory detail.
+
+Purchasing selects [Finance ADR 0003](adr/0003-purchase-vendor-bills.md), adding
+revision 0002 and an owner-authored received-order vendor bill plan. Source locks
+cover Sales and Purchasing separately; local evidence is recorded in
+[Purchasing verification](../purchasing/verification.md).

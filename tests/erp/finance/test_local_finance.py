@@ -278,7 +278,7 @@ def test_migration_http_contracts_and_restart(business):
     before = {
         r.identifier: r.alembic_revision for r in MetaTable.filter(identifier__in=identifiers)
     }
-    assert upgrade_application("src.erp.finance.migrations:migration")["revision"] == "0001"
+    assert upgrade_application("src.erp.finance.migrations:migration")["revision"] == "0002"
     assert before == {
         r.identifier: r.alembic_revision for r in MetaTable.filter(identifier__in=identifiers)
     }

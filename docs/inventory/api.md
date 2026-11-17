@@ -35,3 +35,8 @@ FastAPI schema failures use detail. Integration failure does not widen permissio
 Discovery/collection schemas and all pinned fixtures are recorded under
  tests/erp/inventory/contracts/sdk-0.5.19; other endpoints are application-owned.
 Actual authenticated HTTP schema verification is part of the local acceptance suite.
+
+Purchasing integration uses public owner-authored plan_purchase_receipt and
+plan_received_guard service methods. The complete movement plan carries purchase origin
+in the immutable snapshot; the receipt fence serializes billing with returns. No new
+arbitrary snapshot HTTP write is exposed and no Inventory DDL change is required.

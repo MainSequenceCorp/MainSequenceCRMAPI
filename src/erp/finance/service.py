@@ -302,23 +302,29 @@ class Service:
             )
         target = uid or UUID(str(request_uid))
         values, lines = self.prepare(resource, payload, target)
-        if old and resource == "invoices" and old["source_order_uid"]:
+        if (
+            old
+            and resource == "invoices"
+            and (old["source_order_uid"] or old["source_purchase_order_uid"])
+        ):
             before = self.draft_payload(resource, old)
             after = InvoiceInput.model_validate(payload).model_dump(mode="json")
             for key in ("kind", "party_uid", "operating_company_uid", "currency_uid"):
                 if str(before[key]) != str(after[key]):
                     raise FinanceError(
-                        422, "source_terms", "Source Sales identities and currency cannot change"
+                        422,
+                        "source_terms",
+                        "Source commercial identities and currency cannot change",
                     )
             if len(old["lines"]) != len(lines):
-                raise FinanceError(422, "source_terms", "Source Sales lines cannot change")
+                raise FinanceError(422, "source_terms", "Source commercial lines cannot change")
             for previous, line in zip(old["lines"], lines):
                 if any(
                     previous[k] != line[k]
                     for k in ("description", "quantity", "unit_price", "discount", "net_total")
                 ):
                     raise FinanceError(
-                        422, "source_terms", "Source Sales quantities and prices cannot change"
+                        422, "source_terms", "Source commercial quantities and prices cannot change"
                     )
                 line["source"] = previous["source"]
         if old:
@@ -340,7 +346,9 @@ class Service:
                 updated_by_uid=self.actor_uid,
             )
             if resource == "invoices":
-                values.update(source_order_uid=None, source_order_name=None)
+                values.update(
+                    source_order_uid=None, source_order_name=None, source_purchase_order_uid=None
+                )
             steps = [insert(model).values(**values)]
             version = 1
         if lines:
@@ -744,3 +752,75 @@ class Service:
                 "hasPreviousPage": page_index > 0,
             },
         }
+
+    def plan_from_purchase(self, order, payload):
+        """Complete Finance-owned bill plan; caller joins its source/receipt guards."""
+        self.require("finance.write")
+        from .schemas import PurchaseBillInput
+
+        data = PurchaseBillInput.model_validate(payload)
+        if order["state"] not in {"confirmed", "closed"} or order["bill_uid"]:
+            raise FinanceError(
+                409,
+                "purchase_source",
+                "Only a confirmed or closed purchase order without a bill can be billed",
+            )
+        values, lines = self.prepare(
+            "invoices",
+            {
+                "name": data.name,
+                "kind": "vendor",
+                "party_uid": order["supplier_uid"],
+                "operating_company_uid": order["operating_company_uid"],
+                "currency_uid": order["currency_uid"],
+                "document_date": data.document_date,
+                "due_date": data.due_date,
+                "notes": order["notes"],
+                "lines": [
+                    {
+                        **{
+                            k: line[k]
+                            for k in ("description", "quantity", "unit_price", "discount")
+                        },
+                        "tax_rate": data.tax_rate,
+                    }
+                    for line in order["lines"]
+                ],
+            },
+            data.request_uid,
+        )
+        for source, line in zip(order["lines"], lines):
+            if Decimal(source["net_total"]) != Decimal(line["net_total"]):
+                raise FinanceError(
+                    409,
+                    "source_precision",
+                    "Current currency precision would change the purchase amount",
+                )
+            line["source"] = {
+                "purchase_order_uid": order["uid"],
+                "purchase_order_name": order["name"],
+                "line_uid": source["uid"],
+                "item_uid": source["item_uid"],
+                "unit_uid": source["unit_uid"],
+                "item_name": source["snapshot"]["item_name"],
+            }
+        values.update(
+            uid=data.request_uid,
+            state="draft",
+            allocated="0",
+            version=1,
+            created_at=now(),
+            updated_at=now(),
+            posted_at=None,
+            void_reason="",
+            created_by_uid=self.actor_uid,
+            updated_by_uid=self.actor_uid,
+            source_order_uid=None,
+            source_order_name=None,
+            source_purchase_order_uid=UUID(str(order["uid"])),
+        )
+        return data.request_uid, [
+            insert(Invoice).values(**values),
+            insert(InvoiceLine).values(lines),
+            self.audit("invoices", data.request_uid, "from-purchase", 1, values.keys()),
+        ]

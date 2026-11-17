@@ -66,3 +66,7 @@ legs; GET /api/finance/v1/inventory-valuations/{movement_uid}/ returns the balan
 pair. Both require Finance read. The write plan is a public Python owner contract,
 not an endpoint accepting arbitrary client amounts. Companion Inventory detail
 consumes the owner read through its optional adapter. No statutory GL is implied.
+
+Purchasing handoff uses Finance-owned plan_from_purchase (no arbitrary HTTP snapshot route).
+Invoice.source_purchase_order_uid is distinct from source_order_uid; draft commercial
+source locks also cover vendor bills. The API returns that field on invoice details.

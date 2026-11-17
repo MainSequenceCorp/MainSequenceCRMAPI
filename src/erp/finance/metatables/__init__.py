@@ -115,8 +115,11 @@ def document_checks(prefix):
 class Invoice(Document, Owned, PlatformManagedMetaTable, Base):
     __tablename__ = "erp_finance__invoice"
     __metatable_identifier__ = "erp_finance.invoice"
-    __metatable_description__ = "One customer invoice or vendor bill with exact net/tax/gross amounts, payment allocation balance, lifecycle, party/company snapshots and optional source Sales order."
-    __table_args__ = document_checks("finance_invoice")
+    __metatable_description__ = "One customer invoice or vendor bill with exact net/tax/gross amounts, payment allocation balance, lifecycle, party/company snapshots and optional source Sales or Purchasing order."
+    __table_args__ = (
+        *document_checks("finance_invoice"),
+        UniqueConstraint("source_purchase_order_uid", name="uq_finance_invoice_purchase_order"),
+    )
     due_date: Mapped[date] = field(
         "Due date", "Agreed payment due date, no earlier than document date.", Date()
     )
@@ -134,6 +137,12 @@ class Invoice(Document, Owned, PlatformManagedMetaTable, Base):
     )
     source_order_name: Mapped[str | None] = field(
         "Sales reference", "Confirmed source order reference captured on creation.", String(64)
+    )
+
+    source_purchase_order_uid: Mapped[UUID | None] = field(
+        "Purchase order",
+        "Optional unique confirmed Purchasing source for one full received-order vendor bill.",
+        Uuid(),
     )
 
 
@@ -241,7 +250,9 @@ class Posting(Owned, PlatformManagedMetaTable, Base):
     resource: Mapped[str] = field(
         "Document type", "Invoices, payments or the inventory valuation source.", String(16)
     )
-    record_uid: Mapped[UUID] = field("Document", "Finance document or source stock movement identifier.", Uuid(), index=True)
+    record_uid: Mapped[UUID] = field(
+        "Document", "Finance document or source stock movement identifier.", Uuid(), index=True
+    )
     operating_company_uid: Mapped[UUID] = field(
         "Company", "Base company identifier copied from the document.", Uuid()
     )

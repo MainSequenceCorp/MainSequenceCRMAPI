@@ -11,3 +11,7 @@ focused checks, actual browser flow and all 68 built guides pass. See
 - [Finance extension ADR](../finance/adr/0002-inventory-valuation.md)
 
 No platform migration, push, tag or deployment. No new Agent/MCP.
+
+Purchasing uses [Inventory ADR 0002](adr/0002-purchase-receipts.md) for a complete
+owner-authored receipt plan and received-movement fences. No Inventory DDL changes.
+[Purchasing verification](../purchasing/verification.md) covers the cross-owner flow.

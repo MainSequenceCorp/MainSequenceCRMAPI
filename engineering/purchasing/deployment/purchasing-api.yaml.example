@@ -1,0 +1,51 @@
+# Inert candidate: outside .mainsequence/workflows. Not platform-validated or approved.
+# Validate target branch and access, then obtain user approval before activation.
+api_version: "3.0.0"
+name: purchasing-api
+resources:
+  - key: purchasing
+    kind: fastapi
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      source_path: api/erp/purchasing/main.py
+      mcp_enabled: false
+      cpu_request: "0.5"
+      memory_request: 1Gi
+      spot: false
+      automatic_deployment: true
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-purchasing$'
+      revision_retention_count: 3
+  - key: migrate-purchasing
+    kind: job
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      name: Purchasing migrations
+      description: Apply only Purchasing migrations before Purchasing API activation.
+      execution_path: jobs/erp/purchasing/migrate.py
+      cpu_request: "0.5"
+      memory_request: "1"
+      max_runtime_seconds: 1800
+      spot: false
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-purchasing$'
+execution:
+  steps:
+    image:
+      prepare_image: purchasing
+    migrate:
+      run_job: migrate-purchasing
+      image_from: image
+      needs: [image]
+    deploy_api:
+      deploy: purchasing
+      image_from: image
+      needs: [migrate]

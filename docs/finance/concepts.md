@@ -48,3 +48,8 @@ legs; GET /api/finance/v1/inventory-valuations/{movement_uid}/ returns the balan
 pair. Both require Finance read. The write plan is a public Python owner contract,
 not an endpoint accepting arbitrary client amounts. Companion Inventory detail
 consumes the owner read through its optional adapter. No statutory GL is implied.
+
+Purchasing can create one full received-order draft vendor bill through an authorized
+Finance plan. Commercial source terms stay locked; dates/tax remain editable. Returns
+require financial review and never imply automatic credits. Finance revision 0002
+owns the nullable unique Purchasing source reference; existing manual/Sales flows remain.

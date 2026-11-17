@@ -139,3 +139,11 @@ class FromSalesInput(Input):
         if self.due_date < self.document_date:
             raise ValueError("Due date cannot precede invoice date")
         return self
+
+
+class PurchaseBillInput(Input):
+    request_uid: UUID
+    name: Reference
+    document_date: date
+    due_date: date
+    tax_rate: DecimalText = "0"

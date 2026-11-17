@@ -145,7 +145,7 @@ def create_app(*, enabled=True, local=False):
                 "status": "ready",
                 "module": "finance",
                 "local": local,
-                "schema_revision": "0001",
+                "schema_revision": "0002",
                 "data_source_uid": current.store.data_source_uid,
                 "dependencies": current.dependencies.ready(),
                 "capabilities": sorted(current.capabilities),

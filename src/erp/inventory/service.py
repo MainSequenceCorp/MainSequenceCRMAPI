@@ -763,3 +763,87 @@ class Service:
         finance = self.dependencies.finance()
         self.same_source(finance)
         return finance.inventory_valuation(uid)
+
+    def plan_purchase_receipt(self, order, line, payload):
+        """Complete owner-authored plan; caller joins its own guarded unique line claim."""
+        self.require("inventory.manage")
+        stock = self.active("stock-items", payload["stock_item_uid"])
+        if (
+            order["state"] != "confirmed"
+            or line["snapshot"]["kind"] != "product"
+            or stock["item_uid"] != line["item_uid"]
+            or stock["unit_uid"] != line["snapshot"]["stock_unit_uid"]
+            or stock["increment"] != line["snapshot"]["stock_increment"]
+            or stock["operating_company_uid"] != order["operating_company_uid"]
+        ):
+            raise InventoryError(
+                422,
+                "purchase_stock_mismatch",
+                "Choose the matching company, product and stock unit for this purchase line",
+            )
+        values, steps = self.plan_movement(
+            {
+                **payload,
+                "quantity": line["snapshot"]["stock_quantity"],
+                "reason": "Confirmed full purchase-line receipt",
+            }
+        )
+        if values["kind"] != "receipt":
+            raise InventoryError(
+                422,
+                "receipt_locations",
+                "Purchasing requires a supplier source and internal destination",
+            )
+        values["snapshot"].update(
+            purchase_order_uid=str(order["uid"]),
+            purchase_order_name=order["name"],
+            purchase_line_uid=str(line["uid"]),
+        )
+        uid = values["uid"]
+        return uid, [
+            *steps,
+            insert(Move).values(**values),
+            self.audit("movements", uid, "purchase_receipt", 1, values),
+        ]
+
+    def plan_received_guard(self, moves):
+        """Fence all received movements together, within the SDK transaction statement limit."""
+        self.require("inventory.manage")
+        from sqlalchemy import and_, or_
+
+        if not moves or len(moves) > 100:
+            raise InventoryError(
+                422, "receipts", "Provide one through one hundred receipt references"
+            )
+        current = [self.get("movements", row["uid"]) for row in moves]
+        if len({row["uid"] for row in current}) != len(current) or any(
+            row["state"] != "done"
+            or row["reversal_uid"]
+            or row["reverses_uid"]
+            or row["kind"] != "receipt"
+            or row["version"] != original["version"]
+            for row, original in zip(current, moves)
+        ):
+            raise InventoryError(
+                409, "receipt_changed", "Receipts must be current, completed and unreturned"
+            )
+        return [
+            GuardedStatement(
+                update(Move)
+                .where(
+                    or_(
+                        *(
+                            and_(Move.uid == key(row["uid"]), Move.version == row["version"])
+                            for row in current
+                        )
+                    ),
+                    Move.state == "done",
+                    Move.reversal_uid.is_(None),
+                    Move.reverses_uid.is_(None),
+                )
+                .values(version=Move.version + 1, updated_at=now(), updated_by_uid=self.actor_uid)
+                .returning(Move.uid),
+                expect_rows=len(current),
+                label="received_movements",
+            )
+        ]

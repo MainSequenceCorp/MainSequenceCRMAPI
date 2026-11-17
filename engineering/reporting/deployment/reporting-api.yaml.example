@@ -1,0 +1,51 @@
+# Inert candidate: outside .mainsequence/workflows. Not platform-validated or approved.
+# Validate target branch and access, then obtain user approval before activation.
+api_version: "3.0.0"
+name: reporting-api
+resources:
+  - key: reporting
+    kind: fastapi
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      source_path: api/erp/reporting/main.py
+      mcp_enabled: false
+      cpu_request: "0.5"
+      memory_request: 1Gi
+      spot: false
+      automatic_deployment: true
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-reporting$'
+      revision_retention_count: 3
+  - key: migrate-reporting
+    kind: job
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      name: Reporting and automation migrations
+      description: Apply only Reporting and automation migrations before Reporting and automation API activation.
+      execution_path: jobs/erp/reporting/migrate.py
+      cpu_request: "0.5"
+      memory_request: "1"
+      max_runtime_seconds: 1800
+      spot: false
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-reporting$'
+execution:
+  steps:
+    image:
+      prepare_image: reporting
+    migrate:
+      run_job: migrate-reporting
+      image_from: image
+      needs: [image]
+    deploy_api:
+      deploy: reporting
+      image_from: image
+      needs: [migrate]

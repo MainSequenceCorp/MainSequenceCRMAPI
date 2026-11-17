@@ -1,0 +1,9 @@
+site_name: Reporting and automation API
+site_url: http://127.0.0.1/docs/reporting/
+docs_dir: ../../docs/reporting
+site_dir: ../../.local/docs/reporting
+nav:
+  - Overview: index.md
+  - Concepts: concepts.md
+  - API: api.md
+  - Local operations: delivery.md

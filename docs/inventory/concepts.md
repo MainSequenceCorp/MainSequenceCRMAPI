@@ -47,3 +47,11 @@ Lots/serials/packages, hierarchies, transit, partial/backorders, procurement rul
 barcode picking, scheduled stock work, cost changes and multi-line picking are
 explicit future scope. Production integration belongs to the Manufacturing stage;
 supplier-order receipt creation to Purchasing. No new Agent/MCP is included.
+
+## Coordinated manufacturing batches
+
+Production location usage and the nullable manufacturing source link belong to
+Inventory revision 0002. Public complete preparation/transition/Finance plans own
+all stock writes and require exact complete batch membership. Individual movement
+complete/cancel/Finance/return actions reject coordinated batches. Manufacturing
+links its own state/version/audit atomically to these plans on the same source.

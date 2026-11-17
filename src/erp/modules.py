@@ -12,6 +12,12 @@ class Module:
 
 
 MODULES = {
+    "manufacturing": Module(
+        "manufacturing",
+        "/api/manufacturing/v1",
+        "src.erp.manufacturing.migrations:migration",
+        ("base", "catalog", "inventory"),
+    ),
     "purchasing": Module(
         "purchasing",
         "/api/purchasing/v1",

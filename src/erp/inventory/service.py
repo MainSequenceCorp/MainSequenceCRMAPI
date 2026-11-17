@@ -428,6 +428,8 @@ class Service:
             ("internal", "customer"): "delivery",
             ("internal", "internal"): "transfer",
             ("adjustment", "internal"): "adjustment_in",
+            ("production", "internal"): "production_in",
+            ("internal", "production"): "production_out",
             ("internal", "adjustment"): "adjustment_out",
         }
         kind = kinds.get((source["usage"], dest["usage"]))
@@ -465,6 +467,7 @@ class Service:
             "snapshot": snapshot,
             "net_value": self.value(Decimal(data.quantity) * signed, stock),
             "sales_order_uid": None,
+            "manufacturing_order_uid": None,
             "sales_line_uid": None,
             "reversal_uid": None,
             "reverses_uid": None,
@@ -493,6 +496,12 @@ class Service:
 
     def movement(self, payload):
         values, steps = self.plan_movement(payload)
+        if values["kind"].startswith("production_"):
+            raise InventoryError(
+                422,
+                "coordinated_production",
+                "Create production movements through a Manufacturing order",
+            )
         uid = values["uid"]
         self.transact(
             [
@@ -555,6 +564,7 @@ class Service:
     def transition(self, uid, action, expected):
         self.require("inventory.manage")
         row = self.raw("movements", uid)
+        self.require_standalone(row)
         self.version(row, expected)
         steps = []
         if action == "prepare" and row["state"] == "draft":
@@ -658,6 +668,7 @@ class Service:
     def post_finance(self, uid, expected):
         self.require("inventory.manage")
         row = self.raw("movements", uid)
+        self.require_standalone(row)
         self.version(row, expected)
         if (
             row["state"] != "done"
@@ -693,6 +704,7 @@ class Service:
         self.require("inventory.manage")
         data = ReturnInput.model_validate(payload)
         row = self.raw("movements", uid)
+        self.require_standalone(row)
         self.version(row, data.expected_version)
         if row["state"] != "done" or row["reversal_uid"] or row["reverses_uid"]:
             raise InventoryError(
@@ -847,3 +859,48 @@ class Service:
                 label="received_movements",
             )
         ]
+
+    def stock_policy(self, company_uid, item_uid):
+        """Public read contract for the unique active company/product policy."""
+        self.require("inventory.read")
+        rows = self.store.read(
+            select(StockItem.uid)
+            .where(
+                StockItem.operating_company_uid == key(company_uid),
+                StockItem.item_uid == key(item_uid),
+            )
+            .limit(1)
+        )
+        if not rows:
+            raise InventoryError(
+                422, "stock_policy", "Configure a stock item for every company product first"
+            )
+        return self.active("stock-items", rows[0]["uid"])
+
+    def plan_prepare_production(self, payload):
+        from .production import ProductionPlans
+
+        return ProductionPlans(self).prepare(payload)
+
+    def plan_transition_production(self, *args):
+        from .production import ProductionPlans
+
+        return ProductionPlans(self).transition(*args)
+
+    def plan_finance_production(self, *args):
+        from .production import ProductionPlans
+
+        return ProductionPlans(self).finance(*args)
+
+    def production_valuation(self, *args):
+        from .production import ProductionPlans
+
+        return ProductionPlans(self).valuation(*args)
+
+    def require_standalone(self, row):
+        if row.get("manufacturing_order_uid"):
+            raise InventoryError(
+                409,
+                "coordinated_production",
+                "Manage this complete stock batch through its Manufacturing order",
+            )

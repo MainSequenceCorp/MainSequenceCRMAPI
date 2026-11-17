@@ -1,0 +1,71 @@
+{
+  "format": "command-center-contract-manifest@v1",
+  "package": "@dev-mainsequence/command-center-sdk",
+  "npmPath": "@dev-mainsequence/command-center-sdk/contracts/manifest.json",
+  "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "schemas": [
+    {
+      "contract": "command-center.resource_collection@v1",
+      "id": "urn:mainsequence:command-center-sdk:schema:resource-collection:v1",
+      "file": "schemas/resource-collection-v1.schema.json",
+      "npmPath": "@dev-mainsequence/command-center-sdk/contracts/schemas/resource-collection-v1.schema.json",
+      "role": "normalized-adapter-response",
+      "typescript": {
+        "entrypoint": "@dev-mainsequence/command-center-sdk/resource",
+        "type": "ResourceListResult<T>"
+      },
+      "fixtures": {
+        "valid": [
+          "fixtures/valid/resource-collection-v1.minimal.json",
+          "fixtures/valid/resource-collection-v1.with-controls.json"
+        ],
+        "invalid": [
+          "fixtures/invalid/resource-collection-v1.negative-total.json",
+          "fixtures/invalid/resource-collection-v1.select-without-options.json"
+        ]
+      }
+    },
+    {
+      "contract": "command-center.bulk_action_discovery@v1",
+      "id": "urn:mainsequence:command-center-sdk:schema:bulk-action-discovery:v1",
+      "file": "schemas/bulk-action-discovery-v1.schema.json",
+      "npmPath": "@dev-mainsequence/command-center-sdk/contracts/schemas/bulk-action-discovery-v1.schema.json",
+      "role": "backend-response",
+      "typescript": {
+        "entrypoint": "@dev-mainsequence/command-center-sdk/resource",
+        "type": "ResourceBulkActionDiscoveryResponse"
+      },
+      "fixtures": {
+        "valid": [
+          "fixtures/valid/bulk-action-discovery-v1.empty.json",
+          "fixtures/valid/bulk-action-discovery-v1.archive.json"
+        ],
+        "invalid": [
+          "fixtures/invalid/bulk-action-discovery-v1.unsafe-endpoint.json",
+          "fixtures/invalid/bulk-action-discovery-v1.duplicate-selection-mode.json"
+        ]
+      }
+    },
+    {
+      "contract": "command-center.resource_discovery@v1",
+      "id": "urn:mainsequence:command-center-sdk:schema:resource-discovery:v1",
+      "file": "schemas/resource-discovery-v1.schema.json",
+      "npmPath": "@dev-mainsequence/command-center-sdk/contracts/schemas/resource-discovery-v1.schema.json",
+      "role": "backend-response",
+      "typescript": {
+        "entrypoint": "@dev-mainsequence/command-center-sdk/resource",
+        "type": "ResourceDiscoveryResponse"
+      },
+      "fixtures": {
+        "valid": [
+          "fixtures/valid/resource-discovery-v1.records.json"
+        ],
+        "invalid": [
+          "fixtures/invalid/resource-discovery-v1.incomplete-generic-column.json",
+          "fixtures/invalid/resource-discovery-v1.unsafe-identity.json",
+          "fixtures/invalid/resource-discovery-v1.unknown-field.json"
+        ]
+      }
+    }
+  ]
+}

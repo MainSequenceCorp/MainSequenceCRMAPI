@@ -313,7 +313,7 @@ def test_archive_restore_precision_restart_and_isolation(stock, monkeypatch):
         [".venv/bin/python", "-c", script], text=True, capture_output=True, check=True
     )
     assert "fresh stock persisted" in result.stdout
-    assert upgrade_application("src.erp.inventory.migrations:migration")["revision"] == "0001"
+    assert upgrade_application("src.erp.inventory.migrations:migration")["revision"] == "0002"
     monkeypatch.setenv("INVENTORY_LOCAL_SOURCE_UID", str(uuid4()))
     with pytest.raises(RuntimeError):
         create_app()

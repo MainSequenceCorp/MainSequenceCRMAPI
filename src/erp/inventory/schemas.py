@@ -31,7 +31,7 @@ class LocationInput(Input):
 
 class LocationCreate(LocationInput, Create):
     operating_company_uid: UUID
-    usage: Literal["internal", "supplier", "customer", "adjustment"]
+    usage: Literal["internal", "supplier", "customer", "adjustment", "production"]
 
 
 class LocationUpdate(LocationInput, VersionInput):
@@ -72,3 +72,19 @@ class FromSales(Create):
     stock_item_uid: UUID
     source_uid: UUID
     destination_uid: UUID
+
+
+class ProductionQuantity(Input):
+    stock_item_uid: UUID
+    quantity: DecimalText
+
+
+class ProductionPlanInput(Input):
+    order_uid: UUID
+    name: str = Field(min_length=1, max_length=64)
+    operating_company_uid: UUID
+    source_uid: UUID
+    destination_uid: UUID
+    production_location_uid: UUID
+    output: ProductionQuantity
+    components: list[ProductionQuantity] = Field(min_length=1, max_length=8)

@@ -59,12 +59,12 @@ class Archivable:
 class Location(Owned, Tracked, Archivable, PlatformManagedMetaTable, Base):
     __tablename__ = "erp_inventory__location"
     __metatable_identifier__ = "erp_inventory.location"
-    __metatable_description__ = "One company stock location with internal, supplier, customer or adjustment usage; only internal locations hold physical on-hand balances."
+    __metatable_description__ = "One company stock location with internal, supplier, customer, adjustment or virtual production usage; only internal locations hold physical on-hand balances."
 
     __table_args__ = (
         UniqueConstraint("operating_company_uid", "code", name="uq_inventory_location_code"),
         CheckConstraint(
-            "usage IN ('internal','supplier','customer','adjustment')",
+            "usage IN ('internal','supplier','customer','adjustment','production')",
             name="ck_inventory_location_usage",
         ),
     )
@@ -76,7 +76,9 @@ class Location(Owned, Tracked, Archivable, PlatformManagedMetaTable, Base):
         "Company", "Immutable Base operating-company identifier.", Uuid(), index=True
     )
     usage: Mapped[str] = field(
-        "Usage", "Internal stock, supplier, customer or adjustment boundary.", String(16)
+        "Usage",
+        "Internal stock, supplier, customer, adjustment or virtual production boundary.",
+        String(16),
     )
 
 
@@ -163,6 +165,9 @@ class Move(Owned, Tracked, PlatformManagedMetaTable, Base):
         ),
         UniqueConstraint("sales_line_uid", name="uq_inventory_sales_line"),
         UniqueConstraint("reverses_uid", name="uq_inventory_return"),
+        UniqueConstraint(
+            "manufacturing_order_uid", "stock_item_uid", name="uq_inventory_production_product"
+        ),
     )
     name: Mapped[str] = field("Reference", "Operator reference for this movement.", String(200))
     stock_item_uid: Mapped[UUID] = field(
@@ -193,7 +198,9 @@ class Move(Owned, Tracked, PlatformManagedMetaTable, Base):
         "Quantity", "Exact positive quantity expressed in the stock unit.", String(48)
     )
     kind: Mapped[str] = field(
-        "Kind", "Receipt, delivery, transfer, adjustment_in, adjustment_out or return.", String(24)
+        "Kind",
+        "Receipt, delivery, transfer, adjustment_in, adjustment_out, production_in, production_out or return.",
+        String(24),
     )
     state: Mapped[str] = field(
         "Status", "Draft, ready with reservation, done or cancelled.", String(16), index=True
@@ -208,6 +215,12 @@ class Move(Owned, Tracked, PlatformManagedMetaTable, Base):
         "Company value",
         "Signed company inventory value change; zero for internal transfers.",
         String(64),
+    )
+    manufacturing_order_uid: Mapped[UUID | None] = field(
+        "Manufacturing order",
+        "Optional coordinated full production batch; individual movement mutations are prohibited.",
+        Uuid(),
+        index=True,
     )
     sales_order_uid: Mapped[UUID | None] = field(
         "Sales order",

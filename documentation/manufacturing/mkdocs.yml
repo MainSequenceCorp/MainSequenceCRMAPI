@@ -1,0 +1,9 @@
+site_name: Manufacturing API
+site_url: http://127.0.0.1/docs/manufacturing/
+docs_dir: ../../docs/manufacturing
+site_dir: ../../.local/docs/manufacturing
+nav:
+  - Overview: index.md
+  - Concepts: concepts.md
+  - API: api.md
+  - Local operations: delivery.md

@@ -56,7 +56,7 @@ class Store:
         if (
             len(sources) != 1
             or providers != {"src.erp.inventory:erp-inventory"}
-            or revisions != {"0001"}
+            or revisions != {"0002"}
             or None in providers
         ):
             raise RuntimeError(

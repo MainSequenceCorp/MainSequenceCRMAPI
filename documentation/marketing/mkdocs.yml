@@ -1,0 +1,9 @@
+site_name: Marketing API
+site_url: http://127.0.0.1:38721/
+docs_dir: ../../docs/marketing
+site_dir: ../../.local/docs/marketing
+nav:
+  - Overview: index.md
+  - Concepts: concepts.md
+  - API: api.md
+  - Local delivery: delivery.md

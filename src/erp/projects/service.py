@@ -305,6 +305,29 @@ class Service:
         )
         return self.get("tasks", uid)
 
+    def plan_assignment(
+        self, uid, *, person_uid, operating_company_uid, expected_version, expected_project_version
+    ):
+        """Public owner command plan for authorized same-source workforce staffing."""
+        self.require("projects.write")
+        task = self.row("tasks", uid)
+        project = self.row("projects", task["project_uid"])
+        self.editable_project(project)
+        if project["operating_company_uid"] != str(operating_company_uid):
+            raise ProjectsError(422, "company", "Employee and project must use the same company")
+        if task["state"] in {"done", "cancelled"}:
+            raise ProjectsError(409, "task_frozen", "Reopen the task before staffing")
+        self.references(project)
+        data = {"assignee_party_uid": key(person_uid), "assignee_name": self.assignee(person_uid)}
+        return task, [
+            self.guard("projects", project, expected_project_version, {}),
+            self.guard("tasks", task, expected_version, data),
+            self.audit("tasks", uid, "staff", expected_version + 1, data),
+            self.audit(
+                "projects", project["uid"], "task-staff", expected_project_version + 1, ["tasks"]
+            ),
+        ]
+
     def task_state(self, uid, state, expected_version, expected_project_version):
         self.require("projects.write")
         task = self.row("tasks", uid)

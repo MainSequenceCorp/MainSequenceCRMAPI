@@ -1,0 +1,9 @@
+site_name: People API
+site_url: http://127.0.0.1:38701/
+docs_dir: ../../docs/people
+site_dir: ../../.local/docs/people
+nav:
+  - Overview: index.md
+  - Concepts: concepts.md
+  - API: api.md
+  - Local delivery: delivery.md

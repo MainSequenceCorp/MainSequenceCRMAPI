@@ -12,7 +12,10 @@ class Module:
 
 
 MODULES = {
-    "projects": Module("projects", "/api/projects/v1", "src.erp.projects.migrations:migration", ("base",)),
+    "people": Module("people", "/api/people/v1", "src.erp.people.migrations:migration", ("base",)),
+    "projects": Module(
+        "projects", "/api/projects/v1", "src.erp.projects.migrations:migration", ("base",)
+    ),
     "finance": Module(
         "finance", "/api/finance/v1", "src.erp.finance.migrations:migration", ("base",)
     ),

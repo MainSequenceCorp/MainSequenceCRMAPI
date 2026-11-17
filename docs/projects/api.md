@@ -49,3 +49,14 @@ All failures use error.code/message with 403/404/409/422/503 as appropriate; Pyd
 validation uses standard 422 detail. Uncertain creation reconciles by original UUID,
 never automatic write replay. Reload after version conflict. `GET /audit/` takes
 resource/record_uid and returns the latest 100 events to configure-authorized callers.
+
+## Workforce staffing extension
+
+Projects publishes `Service.plan_assignment(uid, person_uid, operating_company_uid,
+expected_version, expected_project_version)` for the optional People integration.
+It validates the caller's Projects write/read and Base read capabilities, active
+Base references, same-company identity and editable project/task, then returns the
+task and owner-authored guarded assignment/project/audit statements. It performs no
+write itself. People composes them with its employee guard/audit in one governed
+same-source transaction. No People dependency is added to Projects core or migration
+history. Existing task API behavior is unchanged.

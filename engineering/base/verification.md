@@ -79,3 +79,15 @@ UUID only while that editor remains mounted.
 The other session's CRM migration/facade cleanup is separate work. Its edits
 are neither rolled back nor included in the Base implementation commits.
 Do not start step 2 while Base's hosted completion gates remain open.
+
+## Projects companion contract extension (17 November 2026)
+
+The authorized local expansion adds a public `kind=person|organization` filter
+to Base party collections. Filtering occurs before count and pagination; invalid
+resource/kind combinations return 422. The actual Projects assignment picker uses
+this read contract. Tests include ordered mixed-kind data, HTTP validation, and
+Base/Projects integration. The final ERP regression passed 512 tests, including
+these checks. Base was restarted locally with CRM adoption enabled. No Base DDL
+or revision changed; hosted release gates remain open. The user's subsequent
+authorization of all local stages supersedes the historical step-2 sequencing
+restriction above; it does not authorize platform deployment.

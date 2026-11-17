@@ -133,3 +133,9 @@ class FromSalesInput(Input):
         if Decimal(value) > 100:
             raise ValueError("Tax percentage must be between 0 and 100")
         return value
+
+    @model_validator(mode="after")
+    def dates(self):
+        if self.due_date < self.document_date:
+            raise ValueError("Due date cannot precede invoice date")
+        return self

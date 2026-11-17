@@ -134,3 +134,12 @@ After CRM adoption is activated, launch Base with `CRM_BASE_ADOPTION=1` and
 use the CRM `scripts.erp.crm.serve_local_with_base` launcher with the reviewed
 source UUID. The [step-2 local procedure](../../docs/crm/delivery/base-adoption.md)
 supersedes the independent step-1 launch commands for that activated source.
+
+## Projects integration: person selection
+
+Public Base collection/HTTP reads now accept optional `kind=person|organization`
+for parties. Filtering occurs before count and pagination; other resources reject
+kind with 422. Projects assignee lookup consumes this owner read contract without
+foreign table access. Existing calls, identity scope and migrations are unchanged.
+The later user instruction authorizes the remaining local sequence; hosted gates
+remain open. Tests/evidence for this extension are recorded in Projects verification.

@@ -169,6 +169,7 @@ def create_app(*, enabled=True, local=False):
                 page_size: int = Query(25, ge=1, le=100),
                 search: str = Query("", max_length=200),
                 archived: bool = False,
+                kind: str | None = None,
             ):
                 return service().collection(
                     resource,
@@ -176,6 +177,7 @@ def create_app(*, enabled=True, local=False):
                     page_size=page_size,
                     search=search,
                     archived=archived,
+                    kind=kind,
                 )
 
             def describe(request: Request):

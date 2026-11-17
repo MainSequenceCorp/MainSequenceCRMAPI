@@ -369,3 +369,17 @@ def test_older_allocation_remains_accessible_and_reversible(business):
         first["allocation_uid"], first["invoice"]["version"], first["payment"]["version"]
     )
     assert result["invoice"]["remaining"] == result["payment"]["remaining"] == "120.00"
+
+
+def test_source_invoice_due_date_is_validated_before_handoff():
+    from src.erp.finance.schemas import FromSalesInput
+
+    with pytest.raises(ValidationError):
+        FromSalesInput(
+            request_uid=uuid4(),
+            order_uid=uuid4(),
+            expected_order_version=1,
+            name="INVALID-DATE",
+            document_date=date.today(),
+            due_date=date.today() - timedelta(days=1),
+        )

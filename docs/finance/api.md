@@ -44,3 +44,9 @@ both document references, and retained active/reversed history. Detail embeds th
 first page as `allocations` and `allocations_page_info`; older active allocations
 remain reachable and reversible. Voided records retain original amounts and show
 zero remaining balance with payment status `void`.
+
+Projects billing uses public `Service.plan_from_sales`, which returns the invoice UID
+and complete owner-authored guarded statements. It retains Finance validation/audit
+and the Sales owner link plan; same-source callers commit the entire plan with their
+own guard. Existing `from_sales` executes that plan and returns the saved invoice.
+No schema or HTTP behavior changes. A failed caller guard rolls all owners back.

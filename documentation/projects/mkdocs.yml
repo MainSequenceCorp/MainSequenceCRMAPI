@@ -1,0 +1,12 @@
+site_name: Projects API
+site_description: Independently owned Projects contracts and local delivery
+site_url: http://localhost/
+docs_dir: ../../docs/projects
+site_dir: ../../site/projects
+theme:
+  name: mkdocs
+nav:
+  - Overview: index.md
+  - Concepts: concepts.md
+  - API: api.md
+  - Local delivery: delivery.md

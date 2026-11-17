@@ -145,3 +145,11 @@ business routes and preserves storage. Existing CRM tests remain passing.
 Record local evidence and limitations in `engineering/base/verification.md`.
 Do not start CRM extraction or another module. Without platform approval, report
 Base as locally verified with its hosted completion gates still open.
+
+## Addendum: delivery-person lookup
+
+Projects requires paginated person selection. Add optional party-kind filtering to
+Base's public read contract before pagination/count; preserve existing consumers,
+identity scope and all migrations. The later user authorization permits this local
+extension and remaining module work; the historical step-1 stopping point above
+is superseded for the local sequence only. Platform gates remain unchanged.

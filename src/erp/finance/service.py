@@ -576,7 +576,8 @@ class Service:
         }
 
     @exact
-    def from_sales(self, payload):
+    def plan_from_sales(self, payload):
+        """Return owner-authored invoice/link statements for one atomic same-source handoff."""
         self.require("finance.write")
         data = FromSalesInput.model_validate(payload)
         sales = self.dependencies.sales()
@@ -641,12 +642,14 @@ class Service:
         plan = sales.plan_attach(
             data.order_uid, data.expected_order_version, "finance", data.request_uid
         )
-        self.transact(
-            [
-                *plan,
-                insert(Invoice).values(**values),
-                insert(InvoiceLine).values(lines),
-                self.audit("invoices", data.request_uid, "from-sales", 1, values.keys()),
-            ]
-        )
-        return self.get("invoices", data.request_uid)
+        return data.request_uid, [
+            *plan,
+            insert(Invoice).values(**values),
+            insert(InvoiceLine).values(lines),
+            self.audit("invoices", data.request_uid, "from-sales", 1, values.keys()),
+        ]
+
+    def from_sales(self, payload):
+        uid, statements = self.plan_from_sales(payload)
+        self.transact(statements)
+        return self.get("invoices", uid)

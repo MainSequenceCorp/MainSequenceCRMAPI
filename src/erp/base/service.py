@@ -60,13 +60,23 @@ class Service:
             raise BaseError(404, "not_found", "Base record not found")
         return rows[0]
 
-    def collection(self, resource, *, page_index=0, page_size=25, search="", archived=False):
+    def collection(
+        self, resource, *, page_index=0, page_size=25, search="", archived=False, kind=None
+    ):
         self.require("base.read")
         table = self.table(resource)
         predicates = [
             self.scope(resource),
             table.c.archived_at.is_not(None) if archived else table.c.archived_at.is_(None),
         ]
+        if kind is not None:
+            if resource != "parties" or kind not in {"person", "organization"}:
+                raise BaseError(
+                    422,
+                    "invalid_filter",
+                    "Kind is supported only for person or organization parties",
+                )
+            predicates.append(table.c.kind == kind)
         if search:
             predicates.append(func.lower(table.c.name).contains(search.lower(), autoescape=True))
         total = int(

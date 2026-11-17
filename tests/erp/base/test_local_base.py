@@ -355,3 +355,27 @@ print("Base independent")
         [sys.executable, "-c", code], check=True, capture_output=True, text=True
     )
     assert result.stdout.strip() == "Base independent"
+
+
+def test_party_kind_filter_before_pagination(base_service, records):
+    prefix = "Kind-filter-" + uuid4().hex[:8]
+    org = records("parties", party(prefix + "-A", kind="organization"))
+    person = records("parties", party(prefix + "-B", kind="person"))
+    result = base_service.collection("parties", search=prefix, kind="person", page_size=1)
+    assert result["pageInfo"]["totalItems"] == 1 and not result["pageInfo"]["hasNextPage"]
+    assert result["items"][0]["uid"] == person["uid"]
+    assert (
+        base_service.collection("parties", search=prefix, kind="organization")["items"][0]["uid"]
+        == org["uid"]
+    )
+    with pytest.raises(BaseError):
+        base_service.collection("countries", kind="person")
+    with pytest.raises(BaseError):
+        base_service.collection("parties", kind="other")
+    with TestClient(
+        create_app(), base_url="http://127.0.0.1", client=("127.0.0.1", 51000)
+    ) as client:
+        response = client.get(
+            "/api/base/v1/parties/", params={"search": prefix, "kind": "person", "page_size": 1}
+        )
+        assert response.status_code == 200 and response.json()["items"][0]["uid"] == person["uid"]

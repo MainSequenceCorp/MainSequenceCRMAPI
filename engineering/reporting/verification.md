@@ -74,3 +74,8 @@ Platform gate remains open: hosted identity/engine/delegation, worker execution 
 workflow validation, module-tag selection and actual deployment are unverified. Inert
 workflow candidate is outside active discovery. No push, tag, hosted migration, workflow
 activation or platform deployment was performed. Explicit approval is required first.
+
+Implementation revisions: API `3a30fb3`; companion frontend `38ad588`. The latter also
+records the completed 14-stage local expansion plan and shared 82-guide navigation.
+These are local Git commits only; schema revision remains Reporting 0001. A subsequent
+documentation-only commit records this pairing without changing either runtime artifact.

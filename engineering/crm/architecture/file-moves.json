@@ -2,7 +2,6 @@
   "domain": "crm",
   "baseline_commit": "7feeee2096f20f7624e7e78005bb0f2983ccc3aa",
   "relocations": {
-    ".agents/agent_card.json": ".agents/domains/crm/agent_card.json",
     ".agents/skills/mainsequence_crm_development/build-mainsequence-crm-api/SKILL.md": ".agents/skills/domains/crm/development/build-mainsequence-crm-api/SKILL.md",
     ".agents/skills/mainsequence_crm_development/build-mainsequence-crm-api/agents/openai.yaml": ".agents/skills/domains/crm/development/build-mainsequence-crm-api/agents/openai.yaml",
     ".agents/skills/mainsequence_crm_development/build-mainsequence-crm-extensions/SKILL.md": ".agents/skills/domains/crm/development/build-mainsequence-crm-extensions/SKILL.md",
@@ -23,7 +22,6 @@
     ".agents/skills/mainsequence_crm_development/maintain-crm-documentation/SKILL.md": ".agents/skills/domains/crm/development/maintain-crm-documentation/SKILL.md",
     ".agents/skills/mainsequence_crm_development/verify-mainsequence-crm-frontend/SKILL.md": ".agents/skills/domains/crm/development/verify-mainsequence-crm-frontend/SKILL.md",
     ".agents/skills/mainsequence_crm_development/verify-mainsequence-crm-frontend/agents/openai.yaml": ".agents/skills/domains/crm/development/verify-mainsequence-crm-frontend/agents/openai.yaml",
-    ".tau/SYSTEM.md": ".tau/domains/crm/SYSTEM.md",
     ".tau/skills/crm-campaigns/SKILL.md": ".tau/skills/crm/crm-campaigns/SKILL.md",
     ".tau/skills/crm-core/SKILL.md": ".tau/skills/crm/crm-core/SKILL.md",
     ".tau/skills/crm-core/references/mcp-usage.md": ".tau/skills/crm/crm-core/references/mcp-usage.md",
@@ -310,19 +308,42 @@
     "tests/test_solution_selling.py": "tests/erp/crm/integration/test_solution_selling.py",
     "tests/test_structure.py": "tests/erp/crm/unit/test_structure.py",
     "tests/test_tau_runtime.py": "tests/erp/crm/agent/test_tau_runtime.py",
-    "tests/test_transfer_store.py": "tests/erp/crm/integration/test_transfer_store.py"
+    "tests/test_transfer_store.py": "tests/erp/crm/integration/test_transfer_store.py",
+    "src/crm/migrations/script.py.mako": "src/erp/crm/migrations/script.py.mako",
+    "src/crm/migrations/registry.py": "src/erp/crm/migrations/registry.py",
+    "src/crm/migrations/__init__.py": "src/erp/crm/migrations/__init__.py",
+    "src/crm/migrations/env.py": "src/erp/crm/migrations/env.py",
+    "src/crm/migrations/versions/__init__.py": "src/erp/crm/migrations/versions/__init__.py",
+    "src/crm/migrations/versions/mainsequence_crm/0012_add_note_title.py": "src/erp/crm/migrations/versions/mainsequence_crm/0012_add_note_title.py",
+    "src/crm/migrations/versions/mainsequence_crm/0015_email_lead_links.py": "src/erp/crm/migrations/versions/mainsequence_crm/0015_email_lead_links.py",
+    "src/crm/migrations/versions/mainsequence_crm/0011_prompter_subject_and_constraints.py": "src/erp/crm/migrations/versions/mainsequence_crm/0011_prompter_subject_and_constraints.py",
+    "src/crm/migrations/versions/mainsequence_crm/0008_google_oauth.py": "src/erp/crm/migrations/versions/mainsequence_crm/0008_google_oauth.py",
+    "src/crm/migrations/versions/mainsequence_crm/0001_create_crm_schema.py": "src/erp/crm/migrations/versions/mainsequence_crm/0001_create_crm_schema.py",
+    "src/crm/migrations/versions/mainsequence_crm/0010_core_prompts.py": "src/erp/crm/migrations/versions/mainsequence_crm/0010_core_prompts.py",
+    "src/crm/migrations/versions/mainsequence_crm/0003_remove_command_receipts.py": "src/erp/crm/migrations/versions/mainsequence_crm/0003_remove_command_receipts.py",
+    "src/crm/migrations/versions/mainsequence_crm/0007_extend_activity_entity_type_for_modules.py": "src/erp/crm/migrations/versions/mainsequence_crm/0007_extend_activity_entity_type_for_modules.py",
+    "src/crm/migrations/versions/mainsequence_crm/0004_remove_crm_workspace_scope.py": "src/erp/crm/migrations/versions/mainsequence_crm/0004_remove_crm_workspace_scope.py",
+    "src/crm/migrations/versions/mainsequence_crm/0009_interaction_participants.py": "src/erp/crm/migrations/versions/mainsequence_crm/0009_interaction_participants.py",
+    "src/crm/migrations/versions/mainsequence_crm/0014_selected_email_history.py": "src/erp/crm/migrations/versions/mainsequence_crm/0014_selected_email_history.py",
+    "src/crm/migrations/versions/mainsequence_crm/0013_campaigns.py": "src/erp/crm/migrations/versions/mainsequence_crm/0013_campaigns.py",
+    "src/crm/migrations/versions/mainsequence_crm/0005_contact_social_links.py": "src/erp/crm/migrations/versions/mainsequence_crm/0005_contact_social_links.py",
+    "src/crm/migrations/versions/mainsequence_crm/0002_add_contact_company_affiliations.py": "src/erp/crm/migrations/versions/mainsequence_crm/0002_add_contact_company_affiliations.py",
+    "src/crm/migrations/versions/mainsequence_crm/__init__.py": "src/erp/crm/migrations/versions/mainsequence_crm/__init__.py",
+    "src/crm/migrations/versions/mainsequence_crm/0006_add_interactions_and_solution_selling.py": "src/erp/crm/migrations/versions/mainsequence_crm/0006_add_interactions_and_solution_selling.py"
   },
-  "compatibility": [
+  "compatibility": [],
+  "platform_entrypoints": [
     ".mainsequence/workflows/",
     "root package/toolchain entrypoints",
     "SDK-managed .agents/skills namespaces",
-    "src/crm/migrations/",
     ".agents/agent_card.json",
     ".tau/SYSTEM.md",
-    ".tau/extensions/crm.py",
-    "api/crm/main.py",
-    "api/crm/local.py",
-    "api/tau/main.py",
-    "jobs/migrate_crm.py"
+    ".tau/extensions/crm.py"
+  ],
+  "removed_shims": [
+    "api/crm/",
+    "api/tau/",
+    "jobs/migrate_crm.py",
+    "scripts/erp/crm/agent/sync_resources.py"
   ]
 }

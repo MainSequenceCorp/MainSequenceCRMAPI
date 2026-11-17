@@ -29,7 +29,7 @@ identifiers. A local Tau conversation needs its own transport branch instead
 of invented platform identifiers.
 
 The assistant's repository-owned identity comes from this project's
-`.agents/domains/crm/agent_card.json`. Its top-level `name` is the Agent name that the
+`.agents/agent_card.json`. Its top-level `name` is the Agent name that the
 platform synchronizes to the deployed Agent. This repository now contains the
 card and a `harness_agent` workflow declaration but no verified managed CRM Agent.
 The platform variant remains unavailable until the workflow creates an Agent runtime in

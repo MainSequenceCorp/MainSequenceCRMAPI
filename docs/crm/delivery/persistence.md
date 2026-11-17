@@ -224,7 +224,7 @@ for local evidence; hosted latency after deployment remains unverified.
 
 ## Migration and runtime boundary
 
-The migration provider is `src.crm.migrations:migration`. It uses namespace
+The migration provider is `src.erp.crm.migrations:migration`. It uses namespace
 `mainsequence-crm`, the repository-prefixed Alembic table
 `mainsequence_crm__alembic_version`, and repository-prefixed application
 names. The `metatables` client from `mainsequence-metatable` runs its Alembic
@@ -232,7 +232,7 @@ revisions with the selected environment connection; the MetaTables API
 reserves and finalizes the catalog bindings.
 
 Nothing migrates at HTTP startup. A fresh API process queries the platform catalog
-for the 36 authored identifiers, validates active Alembic-managed bindings,
+for the 37 authored identifiers, validates active Alembic-managed bindings,
 membership in `mainsequence-crm`, provider, revision, physical names and one data source, then caches
 the typed bindings in memory. Governed operations select that data source. It
 must not register tables or repair schema during a request. No CRM bindings
@@ -248,7 +248,7 @@ Hosted environments are migrated only by the deployment workflow.
 It declares the CRM API (`crm`), the CRM assistant (`crm-assistant`) and
 the `migrate-crm` Job, which runs `jobs/erp/crm/migrate.py` from the candidate
 image. The Job calls
-`metatables.upgrade_application("src.crm.migrations:migration")` and prints the
+`metatables.upgrade_application("src.erp.crm.migrations:migration")` and prints the
 resulting revision and successful catalog reconciliation. It enables INFO
 logging for `metatables.migrations.runner`, which reports preparation, database
 setup, table checks, Alembic execution, finalization and total duration.
@@ -379,8 +379,8 @@ runtime, after `metatables --local runtime status` confirms Local mode and
 `sqlite`:
 
 ```bash
-uv run metatables --local migrations upgrade --provider src.crm.migrations:migration
-uv run metatables --local migrations current --provider src.crm.migrations:migration
+uv run metatables --local migrations upgrade --provider src.erp.crm.migrations:migration
+uv run metatables --local migrations current --provider src.erp.crm.migrations:migration
 ```
 
 See [local development](local-development.md#apply-migrations-locally).
@@ -433,5 +433,15 @@ continue to declare their authored primary namespace through the client contract
 
 The provider key, table UIDs, physical names and migration revision `0015` are
 unchanged by this SDK upgrade and directory relocation. The migration workflow
-continues through `jobs/migrate_crm.py`, which resolves its CRM-owned implementation
+continues through `jobs/erp/crm/migrate.py`, which resolves its CRM-owned implementation
 by file location and does not depend on importing a `jobs` package.
+
+
+## Base identity adoption
+
+Expansion step 2 adds CRM-owned `base_identity_link` in revision `0016`. Base
+revision `0002` owns the shared identity and relationship extensions in its own
+namespace/provider. The identity transfer is an explicit, reconciled operation;
+API startup never performs it. Read the [local adoption procedure](base-adoption.md)
+for writer coordination, activation and recovery. CRM identity columns remain
+an atomic projection for existing consumers. The hosted upgrade is unapproved.

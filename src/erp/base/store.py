@@ -52,7 +52,7 @@ class Store:
         if (
             len(sources) != 1
             or providers != {"src.erp.base:erp-base"}
-            or revisions != {"0001"}
+            or revisions != {"0002"}
             or None in providers
         ):
             raise RuntimeError("Base catalog contains inconsistent revisions or sources")

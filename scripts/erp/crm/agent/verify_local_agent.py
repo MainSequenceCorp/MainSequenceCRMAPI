@@ -133,7 +133,7 @@ state = get_runtime_status()
 assert state['local_mode'] is True and state['dialect'] == 'sqlite'
 assert state['data_source']['class_type'] == 'sqlite'
 assert state['bootstrap']['active'] is True and not state.get('data_source_error')
-result = upgrade_application('src.crm.migrations:migration')
+result = upgrade_application('src.erp.crm.migrations:migration')
 assert result['data_source_uid'] == state['data_source']['uid']
 from src.erp.crm.platform.catalog import CatalogRegistry
 registry = CatalogRegistry()

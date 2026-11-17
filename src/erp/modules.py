@@ -11,7 +11,10 @@ class Module:
     prerequisites: tuple[str, ...] = ()
 
 
-MODULES = {"base": Module("base", "/api/base/v1", "src.erp.base.migrations:migration")}
+MODULES = {
+    "base": Module("base", "/api/base/v1", "src.erp.base.migrations:migration"),
+    "crm": Module("crm", "/api/crm/v1", "src.erp.crm.migrations:migration", ("base",)),
+}
 
 
 def resolve_modules(enabled):

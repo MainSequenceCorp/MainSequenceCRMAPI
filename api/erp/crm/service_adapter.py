@@ -8,6 +8,7 @@ from typing import TypeVar
 from fastapi import HTTPException, Request
 
 from api.erp.crm.query import QueryError
+from src.erp.base.service import BaseError
 from src.erp.crm.contracts import DomainValidationError
 from src.erp.crm.platform.runtime import authenticated_actor, request_port
 from src.erp.crm.repositories.errors import ResourceConflict, ResourceNotFound
@@ -44,6 +45,8 @@ def service_for(request: Request) -> CRMOperations:
 def invoke(call: Callable[[], T], *, value_status: int = 422) -> T:
     try:
         return call()
+    except BaseError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc
     except AccessDenied as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ServiceUnavailable as exc:

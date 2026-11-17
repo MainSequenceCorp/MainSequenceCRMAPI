@@ -24,6 +24,7 @@ from .note import Note
 from .pipeline import Pipeline
 from .prompt import Prompt
 from .settings import Settings
+from .base_identity_link import BaseIdentityLink
 from .solution_selling import (
     SolutionSelling,
     SolutionSellingDiagnosis,
@@ -40,6 +41,7 @@ from .transfer_job import TransferJob
 from .transfer_row import TransferRow
 
 MODELS = {
+    "base_identity_link": BaseIdentityLink,
     "settings": Settings,
     "pipeline": Pipeline,
     "stage": Stage,

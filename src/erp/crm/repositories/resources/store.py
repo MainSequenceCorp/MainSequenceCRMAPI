@@ -5,8 +5,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from ...models.queries import QueryScope
 from ...emails.store import EmailStore
+from ...models.queries import QueryScope
 from ...platform.catalog import CatalogRegistry, configured_registry
 from ..contacts.affiliations import ContactAffiliations
 from ..contacts.merge import ContactMerge
@@ -31,14 +31,34 @@ class GovernedResourceStore:
         self.board_repo = DealBoard(binding_registry, self.reads)
         self.tasks = TaskRepository(binding_registry, self.reads)
         self.settings = SettingsRepository(binding_registry)
+        from ...base_adoption.runtime import enabled
+
+        if enabled():
+            from ...base_adoption.affiliations import Affiliations
+            from ...base_adoption.merge import Merge
+            from ...base_adoption.reads import Reads
+            from ...base_adoption.resources import Resources
+            from ...base_adoption.store import Store
+
+            store = Store(binding_registry, require_active=True)
+            self.identity_resources = Resources(store)
+            self.identity_reads = Reads(store)
+            self.affiliations_repo = Affiliations(store)
+            self.merge_repo = Merge(store)
 
     def collection(self, resource: str, scope: QueryScope) -> dict[str, Any]:
+        if hasattr(self, "identity_reads"):
+            return self.identity_reads.collection(resource, scope)
         return self.reads.collection(resource, scope)
 
     def detail(self, resource: str, uid: uuid.UUID) -> dict[str, Any]:
+        if hasattr(self, "identity_reads"):
+            return self.identity_reads.detail(resource, uid)
         return self.reads.detail(resource, uid)
 
     def create(self, resource: str, actor_uid: uuid.UUID, data: dict[str, Any]) -> dict[str, Any]:
+        if hasattr(self, "identity_resources") and resource in ("contacts", "companies"):
+            return self.identity_resources.create(resource, actor_uid, data)
         return self.mutations.create(resource, actor_uid, data)
 
     def update(
@@ -49,6 +69,8 @@ class GovernedResourceStore:
         expected_version: int,
         data: dict[str, Any],
     ) -> dict[str, Any]:
+        if hasattr(self, "identity_resources") and resource in ("contacts", "companies"):
+            return self.identity_resources.update(resource, actor_uid, uid, expected_version, data)
         return self.mutations.update(resource, actor_uid, uid, expected_version, data)
 
     def archive(
@@ -59,6 +81,10 @@ class GovernedResourceStore:
         expected_version: int,
         archived: bool,
     ) -> dict[str, Any]:
+        if hasattr(self, "identity_resources") and resource in ("contacts", "companies"):
+            return self.identity_resources.archive(
+                resource, actor_uid, uid, expected_version, archived
+            )
         return self.mutations.archive(resource, actor_uid, uid, expected_version, archived)
 
     def transition_company(

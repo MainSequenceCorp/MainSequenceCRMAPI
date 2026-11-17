@@ -31,7 +31,7 @@ from metatables.migrations import alembic_config_for_provider
 from src.erp.crm.campaigns.service import CampaignOperations
 from src.erp.crm.contracts import DomainValidationError, normalized_create
 from src.erp.crm.metatables import MODELS, Base
-from src.crm.migrations import migration
+from src.erp.crm.migrations import migration
 from src.erp.crm.repositories.campaigns import CampaignStore
 from src.erp.crm.repositories.errors import ResourceConflict
 from src.erp.crm.repositories.resources.store import GovernedResourceStore

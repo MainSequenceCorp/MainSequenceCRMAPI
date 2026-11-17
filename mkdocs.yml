@@ -40,6 +40,7 @@ nav:
       - Application MCP: api/mcp.md
   - Delivery:
       - Local development: delivery/local-development.md
+      - Base identity adoption: delivery/base-adoption.md
       - Persistence and migrations: delivery/persistence.md
       - Verification and release: delivery/verification.md
   - Core CRM decisions:

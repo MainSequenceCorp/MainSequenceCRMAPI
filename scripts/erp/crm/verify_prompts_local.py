@@ -112,7 +112,7 @@ def verify() -> None:
                 assert state["local_mode"] is True and state["dialect"] == "sqlite"
                 assert state["data_source"]["class_type"] == "sqlite"
                 assert state["bootstrap"]["active"] is True and not state["data_source_error"]
-                result = upgrade_application("src.crm.migrations:migration")
+                result = upgrade_application("src.erp.crm.migrations:migration")
                 assert result["revision"] == "0010"
                 assert result["data_source_uid"] == state["data_source"]["uid"]
 

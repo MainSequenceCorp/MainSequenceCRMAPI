@@ -73,7 +73,7 @@ are `true` in this repository. Changing the file requires an API restart.
 Normal policy checks still govern each request. See the
 [single-bootstrap ADR](../crm_core/adrs/0004-single-bootstrap-and-assistant-runtime.md)
 for the one-request initialization and assistant runtime contract. The YAML
-has no assistant section: the assistant name comes from `.agents/domains/crm/agent_card.json`.
+has no assistant section: the assistant name comes from `.agents/agent_card.json`.
 In a deployed API process, the Main Sequence SDK resolves the Environment UID
 at runtime and the API looks up the Agent by that card name in the same
 Environment and project branch. The local launcher passes its Tau loopback
@@ -151,8 +151,8 @@ share its SQLite file. Before migrating, check that
 `metatables --local runtime status` reports Local mode and `sqlite`, then run:
 
 ```bash
-uv run metatables --local migrations upgrade --provider src.crm.migrations:migration
-uv run metatables --local migrations current --provider src.crm.migrations:migration
+uv run metatables --local migrations upgrade --provider src.erp.crm.migrations:migration
+uv run metatables --local migrations current --provider src.erp.crm.migrations:migration
 ```
 
 `.venv/bin/pytest tests/erp/crm/integration/test_migrations.py` also runs the whole history on a
@@ -365,7 +365,7 @@ separate repository update is requested.
 Project-owned runtime behavior belongs under `.tau/`. The typed CRM
 tools and their authorization requirements are in
 [ADR 0005](../crm_core/adrs/0005-crm-application-mcp.md). The
-project `.tau/domains/crm/SYSTEM.md` replaces Tau's packaged general prompt so the chat
+project `.tau/SYSTEM.md` replaces Tau's packaged general prompt so the chat
 speaks as a CRM application assistant. Restart Tau or start a new session after
 changing it, then inspect the effective session prompt. The Agent Card controls
 the display name; the process settings intentionally exclude general coding
@@ -475,3 +475,13 @@ Local mode describes the agent/conversation store; the CRM dataset remains the
 configured environment. Remove only disposable records explicitly owned by the
 test, after verifying their current state. Never replay an uncertain setup write.
 The pre-push hook runs its isolated, read-only settings gate on the committed revision.
+
+
+## CRM using shared Base identities
+
+The locally verified expansion-step-2 configuration runs both APIs with
+`CRM_BASE_ADOPTION=1` after independent migrations and controlled extraction.
+Follow [Base identity adoption](base-adoption.md) before enabling it; the CRM
+process must explicitly configure local MetaTables. Do not launch an old CRM
+writer against an activated source. The single ERP site on 5175 provides
+Directory and CRM pages with direct navigation between the same identity.

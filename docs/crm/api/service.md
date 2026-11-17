@@ -64,7 +64,7 @@ and bootstrap shapes, authentication boundary and `503` status are unchanged;
 these are CRM-owned contracts, not new Command Center SDK wire contracts.
 
 A platform Organization Environment UID is distinct from a CRM workspace or
-tenant UID. Assistant identity comes from `.agents/domains/crm/agent_card.json`; CRM YAML
+tenant UID. Assistant identity comes from `.agents/agent_card.json`; CRM YAML
 has no assistant section. At each bootstrap, a trusted, ready local Tau is
 selected in the loopback launcher. Otherwise the API attempts a platform
 Agent lookup by the card's exact name, in the SDK-resolved Environment and

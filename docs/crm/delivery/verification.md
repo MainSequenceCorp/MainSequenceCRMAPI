@@ -1423,7 +1423,7 @@ separately from the passing CRM tests:
 
 1. **Authored metadata is not refreshed on a repeated upgrade.** With an active
    settings table, changing `Settings.__metatable_description__` in an isolated
-   test process and calling `upgrade_application("src.crm.migrations:migration")`
+   test process and calling `upgrade_application("src.erp.crm.migrations:migration")`
    returned `migrated=False`, revision `0009`, but a fresh
    `MetaTable.get_by_uid(...)` still returned the original description. The
    client's `prepare_for_alembic()` reuses active rows, and finalization sends
@@ -1432,7 +1432,7 @@ separately from the passing CRM tests:
    metadata was not changed in source.
 2. **Dropping tables during a local downgrade can fail finalization.** On the
    fresh, empty fixture,
-   `metatables --local migrations downgrade 0007 --provider src.crm.migrations:migration`
+   `metatables --local migrations downgrade 0007 --provider src.erp.crm.migrations:migration`
    applied the DDL, then failed the first `/meta-tables/finalize-managed/` batch
    with HTTP 400 `ordinary_table_required`. `migrations current` confirmed
    `0007`: the failed command had already changed the physical schema.
@@ -1616,7 +1616,7 @@ signed in to it. A local MetaTables API ran from a fresh, isolated storage
 directory, never the default one, and was stopped afterwards. `metatables --local
 runtime initialize` brought the SQLite runtime to system migration
 `0010_cascade_targets` (none pending), and
-`metatables --local migrations upgrade --provider src.crm.migrations:migration head`
+`metatables --local migrations upgrade --provider src.erp.crm.migrations:migration head`
 applied `0001` through `0009` and finalized 27 catalog entries, the 26 tables and
 the Alembic registry: 27 `active`, 0 `reserved`, 0 `failed`.
 `migrations current` reported `0009 (head)`, and a second upgrade finalized
@@ -1627,7 +1627,7 @@ CRM's catalog resolver bound all 26 tables; revision `0004` had seeded the
 impact pre-flight on Company reported deleting rows allowed with five `restrict`
 edges, and updating keys allowed with no edges. The Job script, run against that
 runtime through `configure_local_client()`, reported
-`src.crm.migrations:migration: 0009 (already current)`. Nothing hosted was
+`src.erp.crm.migrations:migration: 0009 (already current)`. Nothing hosted was
 exercised.
 
 Later on 2026-10-04 the API installed the SDK's request identity
@@ -1713,7 +1713,7 @@ original.
 
 On a fresh, isolated local SQLite runtime that MetaTables 0.1.18 initialized
 through system migration `0010_cascade_targets`,
-`metatables --local migrations upgrade --provider src.crm.migrations:migration head`
+`metatables --local migrations upgrade --provider src.erp.crm.migrations:migration head`
 applied `0001` through `0009` and finalized 27 catalog entries, the 26 tables
 and the Alembic registry, all `active`. `migrations current` reported
 `0009 (head)` and a second upgrade changed nothing. The CRM's catalog resolver
@@ -1996,7 +1996,7 @@ key. The push that removes `crm-assistant.yaml` moves one declaration into
 
 | Old workflow file | Key | Kind | Display name |
 | --- | --- | --- | --- |
-| `.mainsequence/workflows/crm-assistant.yaml` (workflow `crm-assistant`) | `crm-assistant` | `harness_agent` | `CRM assistant` (from `.agents/domains/crm/agent_card.json`) |
+| `.mainsequence/workflows/crm-assistant.yaml` (workflow `crm-assistant`) | `crm-assistant` | `harness_agent` | `CRM assistant` (from `.agents/agent_card.json`) |
 
 **Delete nothing after the push.** A Harness Agent is the exception to the
 rule that a moved declaration creates a new target. The backend finds the
@@ -2225,7 +2225,7 @@ Files changed for this extension:
 
 - API: `src/erp/crm/models/notes.py`, `src/erp/crm/metatables/note.py`,
   `src/erp/crm/repositories/resources/{reads,writes,catalog}.py`,
-  `src/crm/migrations/versions/mainsequence_crm/0012_add_note_title.py`,
+  `src/erp/crm/migrations/versions/mainsequence_crm/0012_add_note_title.py`,
   `api/erp/crm/{discovery,mcp_tools}.py`, `tests/{test_notes,test_migrations}.py`,
   and the Notes concept, engagement API, persistence and verification pages.
 - Frontend: `src/notes/{types.ts,NoteForm.tsx,Notes.tsx}`, `src/Resources.tsx`,
@@ -2537,3 +2537,20 @@ restart history and fresh API read-back against private local data at revision
 `.local/agent-pre-push/6da7f469-4eb8-41f7-bdec-dd42d9cfb012/`.
 These dependency updates remain local; the earlier relocation rollout is a
 separate release and is not evidence that these SDK versions are hosted.
+
+
+## CRM extraction and Base adoption (2026-11-17, local only)
+
+The API ADR preceded implementation. Independent Base `0002` and CRM `0016`
+revisions are applied only to verified local MetaTables SQLite. Inventory, copy,
+reconciliation and activation ran with both API writers stopped. The actual
+local inventory was empty; populated extraction was verified with controlled
+fixtures, not hosted data. Both APIs now run locally with adoption enabled.
+
+Executed: 452 ERP regression tests; the final 29-test Base/adoption suite against
+the actual MetaTables API; changed-code Ruff; strict MkDocs; frontend type/build,
+unit and guide checks; real-browser adoption and bidirectional edits. See
+[the procedure and release limits](base-adoption.md). Detailed working-tree
+evidence is in `engineering/crm/base-adoption/verification.md`. Platform release,
+triggering pushes/tags, hosted migration and live external Google/Tau verification
+are not claimed.

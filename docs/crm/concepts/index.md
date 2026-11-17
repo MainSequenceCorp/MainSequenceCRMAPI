@@ -55,7 +55,7 @@ requests can also select active human owners visible in the caller's directory.
 The CRM agent excludes Tau's coding tools and broad Main Sequence MCP while
 retaining application MCP and the SDK's A2A Task controls.
 The runtime's [CRM conversation directives](../crm_core/adrs/0003-tau-crm-agent-tools.md#runtime-answer-and-prompt-boundary)
-are in `.tau/domains/crm/SYSTEM.md`. They define the assistant's CRM role and response
+are in `.tau/SYSTEM.md`. They define the assistant's CRM role and response
 style independently of the intentionally restricted tool profile.
 
 [ADR 0004](../crm_core/adrs/0004-single-bootstrap-and-assistant-runtime.md)

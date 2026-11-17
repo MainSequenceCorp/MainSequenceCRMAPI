@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
+from .identity_contracts import IdentityDetails, RelationshipDetails
+
 Name = Annotated[str, Field(min_length=1, max_length=200)]
 
 
@@ -36,20 +38,51 @@ class CurrencyInput(Input):
 
 
 class PartyInput(Input):
+    name: str = Field(min_length=1, max_length=511)
+    identity: IdentityDetails = Field(default_factory=IdentityDetails)
     kind: Literal["person", "organization"]
     emails: list[EmailStr] = Field(default_factory=list, max_length=20)
-    phones: list[Annotated[str, Field(min_length=3, max_length=50)]] = Field(
+    phones: list[Annotated[str, Field(min_length=1, max_length=100)]] = Field(
         default_factory=list, max_length=20
     )
     language_uid: UUID | None = None
 
+    @model_validator(mode="after")
+    def identity_consistency(self):
+        if len({str(value).casefold() for value in self.emails}) != len(self.emails) or len(
+            set(self.phones)
+        ) != len(self.phones):
+            raise ValueError("Contact methods must be unique")
+        if self.kind == "person" and (self.identity.first_name or self.identity.last_name):
+            self.identity.name_style = "structured"
+            self.name = " ".join(
+                value for value in (self.identity.first_name, self.identity.last_name) if value
+            ).strip()
+        return self
 
-class AffiliationInput(Input):
+
+class AffiliationInput(Input, RelationshipDetails):
     person_uid: UUID
     organization_uid: UUID
     role: str = Field(min_length=1, max_length=150)
     starts_on: date | None = None
     ends_on: date | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def unify_dates(cls, values):
+        values = dict(values)
+        for exact, period in (("starts_on", "started_period"), ("ends_on", "ended_period")):
+            day, partial = values.get(exact), values.get(period)
+            if day and partial and str(day) != partial:
+                raise ValueError("Exact dates and periods must agree")
+            if day and not partial:
+                values[period] = str(day)
+            elif partial:
+                values[exact] = partial if len(partial) == 10 else None
+        if values.get("ended_period") and "status" not in values:
+            values["status"] = "former"
+        return values
 
     @model_validator(mode="after")
     def dates(self):

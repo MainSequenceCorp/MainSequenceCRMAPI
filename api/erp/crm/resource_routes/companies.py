@@ -7,6 +7,8 @@ import uuid
 from fastapi import APIRouter, Request
 
 from api.erp.crm.route_support import _archive, _collection, _create, _detail, _discovery, _patch
+from api.erp.crm.service_adapter import invoke, service_for
+from src.erp.crm.base_adoption.models import AdoptParty
 from src.erp.crm.models.common import VersionCommand
 from src.erp.crm.models.companies import CompanyCreate, CompanyPatch
 
@@ -21,6 +23,11 @@ def discovery(request: Request):
 @router.get("/", name="list-companies")
 def collection(request: Request):
     return _collection("companies", request)
+
+
+@router.post("/adopt/", status_code=201, name="adopt-companies")
+def adopt(request: Request, payload: AdoptParty):
+    return invoke(lambda: service_for(request).adopt_party("companies", payload))
 
 
 @router.get("/{uid}/", name="get-companies")

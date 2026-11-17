@@ -71,7 +71,7 @@ existing policy and directory adapters, an active MetaTable catalog, and a
 default pipeline are available. The API does not accept a caller-supplied
 identity header or workspace selector.
 
-The 27-table migration provider is `src.crm.migrations:migration`. A fresh API
+The 27-table migration provider is `src.erp.crm.migrations:migration`. A fresh API
 process resolves its active, provider-owned MetaTables directly from the platform
 catalog; no local bindings file or application tenant setting is used.
 Migration `0004` replaces the old workspace table with singleton CRM settings
@@ -89,7 +89,7 @@ fields; it is not proof of compatibility with the current client.
 Local development applies revisions to the MetaTables local SQLite runtime:
 
 ```bash
-uv run metatables --local migrations upgrade --provider src.crm.migrations:migration
+uv run metatables --local migrations upgrade --provider src.erp.crm.migrations:migration
 ```
 
 See [persistence and migrations](../../docs/crm/delivery/persistence.md). Governed

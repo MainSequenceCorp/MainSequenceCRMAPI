@@ -54,3 +54,23 @@ merge; if both Contacts attended the same Interaction, the duplicate loser
 entry is removed.
 
 See the [contact API](../api/contacts-companies.md) for paths and request bodies.
+
+## Shared Directory identity
+
+With Base adoption active, a Contact is a CRM sales profile of a shared person.
+Base owns names, labelled email/phone methods, public social links and image
+references. CRM retains owner, qualification, tags, prospecting role and background,
+interaction dates, newsletter flag and business history. Employment relationships
+are Base-owned with a CRM primary-company projection. Year/month date precision
+and original relationship UUIDs survive extraction. Directory access does not
+grant CRM permissions.
+
+CRM merge preserves its business-history and redirect behavior while retaining
+the source Base identity for other modules. Only CRM-owned relationships may move;
+a relationship used by another module blocks that merge. The local portable merge
+is bounded to 1000 related rows per relationship collection; larger cases require
+a controlled data migration. CRM profile archival does not archive the shared
+identity. Active CRM usage blocks Directory identity archival.
+
+See [API adoption](../api/contacts-companies.md#directory-adoption) and the
+[local cutover procedure](../delivery/base-adoption.md).

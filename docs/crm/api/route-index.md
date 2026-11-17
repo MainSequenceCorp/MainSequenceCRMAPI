@@ -24,6 +24,9 @@ FastAPI's generated OpenAPI paths.
 | `POST` | `/api/crm/v1/interactions/` | [Interactions](interactions.md) |
 | `GET` | `/api/crm/v1/interactions/{uid}/` | [Interactions](interactions.md) |
 | `PATCH` | `/api/crm/v1/interactions/{uid}/` | [Interactions](interactions.md) |
+| `GET` | `/api/crm/v1/directory-adoption/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/contacts/adopt/` | [Contacts and companies](contacts-companies.md) |
+| `POST` | `/api/crm/v1/companies/adopt/` | [Contacts and companies](contacts-companies.md) |
 | `GET` | `/api/crm/v1/principals/` | [Service and settings](service.md) |
 | `GET` | `/api/crm/v1/settings/` | [Service and settings](service.md) |
 | `PATCH` | `/api/crm/v1/settings/` | [Service and settings](service.md) |

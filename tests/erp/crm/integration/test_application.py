@@ -89,7 +89,7 @@ def test_local_runtime_is_ready_and_bootstrap_is_a_governed_read(monkeypatch, lo
         operation = operation.model_dump(mode="json")
         operations.append(operation)
         sql = operation["statement"]["sql"]
-        if sql.startswith("SELECT key FROM"):
+        if "mainsequence_crm__settings.key" in sql and "JOIN" not in sql:
             return {"rows": [{"key": "default"}]}
         assert "JOIN" in sql and "mainsequence_crm__pipeline" in sql
         assert operation["dialect"] == dialect

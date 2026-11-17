@@ -14,6 +14,7 @@ from src.erp.base.metatables import RESOURCES, AuditEvent
 from src.erp.base.schemas import INPUTS, AllocationInput, RoundInput, VersionInput
 from src.erp.base.service import BaseError, Service
 from src.erp.base.store import Store
+from src.erp.identity_composition import identity_consumers
 from src.erp.modules import resolve_modules
 
 from .identity import actor_and_capabilities
@@ -82,7 +83,12 @@ def create_app(*, enabled=True, local=False):
 
     def service():
         actor, capabilities = actor_and_capabilities(local=local)
-        return Service(app.state.base_store, actor, capabilities)
+        return Service(
+            app.state.base_store,
+            actor,
+            capabilities,
+            consumers=identity_consumers(app.state.base_store),
+        )
 
     @app.exception_handler(BaseError)
     async def domain_error(_request, error):
@@ -122,7 +128,7 @@ def create_app(*, enabled=True, local=False):
             return {
                 "status": "ready",
                 "module": "base",
-                "schema_revision": "0001",
+                "schema_revision": "0002",
                 "local": local,
                 "capabilities": sorted(current.capabilities),
                 "data_source_uid": source,
@@ -193,7 +199,7 @@ def create_app(*, enabled=True, local=False):
             def edit_record(uid: UUID, payload):
                 return service().save(
                     resource,
-                    payload.model_dump(exclude={"expected_version"}),
+                    payload.model_dump(exclude={"expected_version"}, exclude_unset=True),
                     uid=uid,
                     expected_version=payload.expected_version,
                 )

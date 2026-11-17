@@ -2,7 +2,7 @@
 
 Expansion step 1 implements the shared business foundation. Its API decision is
 [ADR 0001](adr/0001-base-api-foundation.md); evidence and remaining release gates
-are in [verification](verification.md). CRM extraction is step 2 and has not begun.
+are in [verification](verification.md). The user has now authorized CRM extraction as step 2 locally, under its separate API ADR.
 
 ## Ownership
 
@@ -127,4 +127,10 @@ workflow, released with an ERP UI tag only when its code/configuration changes.
 Prepare and validate that exact release and production-engine behavior before
 requesting user approval. No triggering push, tag, hosted migration or platform
 deployment is permitted until explicitly approved. Local verification does not
-close the hosted integration gate or authorize step 2.
+close the hosted integration gate. The subsequent user instruction authorizes step 2 locally only.
+
+
+After CRM adoption is activated, launch Base with `CRM_BASE_ADOPTION=1` and
+use the CRM `scripts.erp.crm.serve_local_with_base` launcher with the reviewed
+source UUID. The [step-2 local procedure](../../docs/crm/delivery/base-adoption.md)
+supersedes the independent step-1 launch commands for that activated source.

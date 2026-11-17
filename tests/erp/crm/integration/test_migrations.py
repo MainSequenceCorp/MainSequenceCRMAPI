@@ -17,7 +17,7 @@ from alembic import command
 
 from metatables.migrations import alembic_config_for_provider
 from metatables.migrations.connection import migration_engine
-from src.crm.migrations import migration
+from src.erp.crm.migrations import migration
 
 
 def test_prompter_revision_preserves_legacy_checks_and_reopens_in_fresh_process(tmp_path):
@@ -74,7 +74,7 @@ def test_prompt_revision_enforces_utf8_bytes_and_preserves_source_on_local_sqlit
             connection.exec_driver_sql(
                 "SELECT version_num FROM mainsequence_crm__alembic_version"
             ).scalar_one()
-            == "0015"
+            == "0016"
         )
         table = sa.Table("mainsequence_crm__prompt", sa.MetaData(), autoload_with=connection)
         connection.commit()
@@ -118,7 +118,7 @@ def _postgresql_bind():
 
 def test_affiliation_backfill_has_no_accidental_sqlalchemy_bind_parameters(monkeypatch):
     revision = importlib.import_module(
-        "src.crm.migrations.versions.mainsequence_crm.0002_add_contact_company_affiliations"
+        "src.erp.crm.migrations.versions.mainsequence_crm.0002_add_contact_company_affiliations"
     )
     statements = []
     monkeypatch.setattr(
@@ -139,7 +139,7 @@ def test_affiliation_backfill_has_no_accidental_sqlalchemy_bind_parameters(monke
 
 def test_receipt_removal_revision_drops_only_obsolete_table(monkeypatch):
     revision = importlib.import_module(
-        "src.crm.migrations.versions.mainsequence_crm.0003_remove_command_receipts"
+        "src.erp.crm.migrations.versions.mainsequence_crm.0003_remove_command_receipts"
     )
     operations = []
     monkeypatch.setattr(
@@ -163,7 +163,7 @@ def test_receipt_removal_revision_drops_only_obsolete_table(monkeypatch):
 
 def test_interaction_participant_migration_backfills_before_removing_primary_contact(monkeypatch):
     revision = importlib.import_module(
-        "src.crm.migrations.versions.mainsequence_crm.0009_interaction_participants"
+        "src.erp.crm.migrations.versions.mainsequence_crm.0009_interaction_participants"
     )
     operations = []
     monkeypatch.setattr(
@@ -340,7 +340,7 @@ def test_revisions_upgrade_and_downgrade_on_the_local_sqlite_runtime(tmp_path):
         migrate("upgrade", "head")
 
         version = sa.text("SELECT version_num FROM mainsequence_crm__alembic_version")
-        assert one(version).version_num == "0015"
+        assert one(version).version_num == "0016"
         settings = _table("mainsequence_crm__settings", name=S, default_currency=S)
         assert tuple(one(sa.select(settings))) == ("Legacy", "EUR")
         affiliation = _table("mainsequence_crm__contact_company_affiliation", uid=U)
@@ -368,7 +368,7 @@ def test_revisions_upgrade_and_downgrade_on_the_local_sqlite_runtime(tmp_path):
         legacy_contact = _table("mainsequence_crm__contact", linkedin_url=S)
         assert one(sa.select(legacy_contact)).linkedin_url == LINKEDIN
         migrate("upgrade", "head")
-        assert one(version).version_num == "0015"
+        assert one(version).version_num == "0016"
         assert one(sa.select(contact)).socials == {"linkedin": LINKEDIN}
 
 

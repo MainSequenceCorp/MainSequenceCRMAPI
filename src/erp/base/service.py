@@ -20,7 +20,8 @@ class BaseError(Exception):
 
 
 class Service:
-    def __init__(self, store, actor_uid, capabilities):
+    def __init__(self, store, actor_uid, capabilities, *, consumers=None):
+        self.consumers = consumers or {}
         self.store, self.actor_uid, self.capabilities = (
             store,
             UUID(str(actor_uid)),
@@ -180,10 +181,56 @@ class Service:
         return guards
 
     def save(self, resource, payload, *, uid=None, expected_version=None):
+        steps, uid = self.plan_save(resource, payload, uid=uid, expected_version=expected_version)
+        return self.transact(
+            [*steps, select(self.table(resource)).where(self.table(resource).c.uid == uid)]
+        )[0]
+
+    def plan_save(
+        self,
+        resource,
+        payload,
+        *,
+        uid=None,
+        expected_version=None,
+        create_uid=None,
+        skip_consumer=None,
+        claims=None,
+        provenance=None,
+        initial_archived_at=None,
+    ):
+        """Public command plan for one atomic transaction with a consuming module.
+
+        The caller must execute every returned statement in order, exactly once.
+        Claims and provenance are trusted extraction inputs, never HTTP payload fields.
+        """
         self.require(self.permission(resource))
+        if resource in {"parties", "affiliations"} and uid is not None:
+            previous = self.get(resource, uid)
+            if resource == "affiliations":
+                payload = dict(payload)
+                for exact, period in (("starts_on", "started_period"), ("ends_on", "ended_period")):
+                    if period in payload and exact not in payload:
+                        value = payload[period]
+                        payload[exact] = value if value and len(value) == 10 else None
+                    elif exact in payload and period not in payload:
+                        payload[period] = str(payload[exact]) if payload[exact] else None
+            # Older clients do not know the additive identity/period fields.
+            payload = {
+                **{k: previous[k] for k in INPUTS[resource].model_fields if k in previous},
+                **payload,
+            }
         data = INPUTS[resource].model_validate(payload).model_dump(mode="python")
         if resource == "parties":
             data["emails"] = [str(email) for email in data["emails"]]
+            from .identity_contracts import IdentityDetails
+
+            data["identity"] = IdentityDetails.model_validate(data["identity"]).model_dump(
+                mode="json"
+            )
+            data["identity"]["socials"] = {
+                k: v for k, v in data["identity"]["socials"].items() if v is not None
+            }
         table = self.table(resource)
         creating = uid is None
         if creating:
@@ -192,6 +239,8 @@ class Service:
                 if resource == "settings"
                 else uuid5(NAMESPACE_URL, f"erp-base:preferences:{self.actor_uid}")
                 if resource == "preferences"
+                else UUID(str(create_uid))
+                if create_uid
                 else uuid4()
             )
         else:
@@ -201,6 +250,7 @@ class Service:
             data["key"] = "default"
         if resource == "preferences":
             data["actor_uid"] = self.actor_uid
+        old = None
         if not creating:
             old = self.get(resource, uid)
             if old["archived_at"]:
@@ -217,9 +267,23 @@ class Service:
                 raise BaseError(409, "stale_version", "The record changed; reload before saving")
         version = 1 if creating else expected_version + 1
         values = {**data, "updated_at": now, "updated_by_uid": self.actor_uid, "version": version}
+        if resource in {"parties", "affiliations"}:
+            values["consumers"] = claims if claims is not None else (old or {}).get("consumers", {})
+            values["provenance"] = (
+                provenance if provenance is not None else (old or {}).get("provenance", {})
+            )
         guards = self.reference_guards(resource, data, uid)
         if creating:
-            values.update(uid=uid, created_at=now, created_by_uid=self.actor_uid, archived_at=None)
+            values.update(
+                uid=uid,
+                created_at=now,
+                created_by_uid=self.actor_uid,
+                archived_at=(
+                    datetime.fromisoformat(initial_archived_at)
+                    if isinstance(initial_archived_at, str)
+                    else initial_archived_at
+                ),
+            )
             if resource == "number-sequences":
                 values["next_number"] = 1
             write = insert(table).values(**values)
@@ -236,15 +300,28 @@ class Service:
                 expect_rows=1,
                 label="record_version",
             )
-        rows = self.transact(
-            [
-                *guards,
-                write,
-                self.audit(resource, uid, "create" if creating else "update", version, data),
-                select(table).where(table.c.uid == uid),
-            ]
+        projections = self.consumer_steps(
+            resource, old, {**(old or {}), **values, "uid": str(uid)}, skip_consumer
         )
-        return rows[0]
+        return [
+            *guards,
+            write,
+            self.audit(resource, uid, "create" if creating else "update", version, data),
+            *projections,
+        ], uid
+
+    def consumer_steps(self, resource, old, new, skip_consumer=None):
+        steps = []
+        for key, claim in new.get("consumers", {}).items():
+            if key == skip_consumer:
+                continue
+            consumer = self.consumers.get(key)
+            if consumer is None:
+                raise BaseError(
+                    503, "consumer_unavailable", f"The {key} identity consumer is not configured"
+                )
+            steps.extend(consumer(resource, old, new, self.actor_uid, claim))
+        return steps
 
     def archive(self, resource, uid, expected_version, *, restore=False):
         self.require(self.permission(resource))
@@ -254,19 +331,33 @@ class Service:
             )
         table, uid = self.table(resource), UUID(str(uid))
         record = self.get(resource, uid)
+        if (
+            resource == "parties"
+            and not restore
+            and any(claim.get("active", True) for claim in record.get("consumers", {}).values())
+        ):
+            raise BaseError(
+                409, "active_consumer", "Archive the module profiles using this record first"
+            )
         if bool(record["archived_at"]) != restore:
             raise BaseError(409, "archive_state", "The record is already in the requested state")
         now = datetime.now(timezone.utc)
+        changes = dict(
+            archived_at=None if restore else now,
+            version=expected_version + 1,
+            updated_at=now,
+            updated_by_uid=self.actor_uid,
+        )
+        if resource == "affiliations":
+            changes["consumers"] = {
+                key: {**claim, "active": restore}
+                for key, claim in record.get("consumers", {}).items()
+            }
         steps = [
             GuardedStatement(
                 update(table)
                 .where(table.c.uid == uid, table.c.version == expected_version)
-                .values(
-                    archived_at=None if restore else now,
-                    version=expected_version + 1,
-                    updated_at=now,
-                    updated_by_uid=self.actor_uid,
-                ),
+                .values(**changes),
                 expect_rows=1,
                 label="archive_version",
             )
@@ -293,6 +384,8 @@ class Service:
                                     label="active_dependents",
                                 )
                             )
+        if resource == "affiliations":
+            steps.extend(self.consumer_steps(resource, record, {**record, **changes}))
         steps.extend(
             [
                 self.audit(

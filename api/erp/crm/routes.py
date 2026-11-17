@@ -17,6 +17,15 @@ from .service_adapter import invoke, service_for
 router = APIRouter(prefix="/api/crm/v1")
 
 
+@router.get("/directory-adoption/", name="directory-adoption-capabilities")
+def directory_adoption(request: Request):
+    from src.erp.crm.base_adoption.runtime import enabled
+    service = service_for(request)
+    invoke(lambda: service.context.require("crm.read"))
+    capabilities = service.context.policy.capabilities(service.context.actor_uid)
+    return {"enabled": enabled(), "can_adopt": "crm.create" in capabilities}
+
+
 @router.get("/principals/", name="list-principals")
 def principals(request: Request):
     return invoke(lambda: service_for(request).principals())

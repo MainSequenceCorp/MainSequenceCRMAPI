@@ -133,7 +133,7 @@ def test_note_title_migration_on_postgresql_and_future_columns(prompts_api, prom
     assert created.status_code == 201, created.text
     legacy = created.json()
     assert legacy["title"] is None
-    revision = importlib.import_module("src.crm.migrations.versions.mainsequence_crm.0012_add_note_title")
+    revision = importlib.import_module("src.erp.crm.migrations.versions.mainsequence_crm.0012_add_note_title")
     with Operations.context(MigrationContext.configure(prompts_db)):
         revision.downgrade()
         assert "title" not in {column["name"] for column in sa.inspect(prompts_db).get_columns(revision.TABLE)}

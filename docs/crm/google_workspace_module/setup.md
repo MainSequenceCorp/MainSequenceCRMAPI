@@ -208,7 +208,7 @@ Do not paste credentials into chat or commit them to Git.
 Migration `0008` must be applied **before** the API with this code starts.
 Hosted environments get it from the deployment workflow's `migrate-crm` Job,
 which runs before the API rolls out; local development applies it with
-`metatables --local migrations upgrade --provider src.crm.migrations:migration`.
+`metatables --local migrations upgrade --provider src.erp.crm.migrations:migration`.
 See [persistence and migrations](../delivery/persistence.md#migration-and-runtime-boundary).
 The new private MetaTables hold one-time OAuth attempts and encrypted
 per-user refresh tokens. The persisted extension activation controls route and frontend

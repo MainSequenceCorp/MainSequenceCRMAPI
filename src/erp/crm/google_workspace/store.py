@@ -366,6 +366,14 @@ class GoogleStore(GovernedGateway):
     ) -> uuid.UUID:
         if entity_type not in {"contact", "interaction"} or action not in {"create", "link", "update"}:
             raise ValueError("Unsupported Google import action")
+        from ..base_adoption.runtime import enabled
+        if entity_type == "contact" and enabled():
+            from ..base_adoption.google import import_contact
+            from ..base_adoption.store import Store
+            return import_contact(Store(self.registry, require_active=True), actor_uid=actor_uid,
+                source_connection_uid=source_connection_uid, external_id=external_id,
+                payload_hash=payload_hash, action=action, target_uid=target_uid,
+                expected_version=expected_version, values=values)
         target = MODELS[entity_type].__tablename__
         identity = MODELS["source_identity"].__tablename__
         activity = MODELS["activity_event"].__tablename__

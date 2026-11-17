@@ -122,6 +122,41 @@ class ContactMerge(GovernedGateway):
         ):
             raise ResourceConflict("Merged contact exceeds a configured field limit")
 
+        counts, leads = self._merge_context(survivor_uid, loser_uid)
+        fingerprint = {
+            "leads": [{"uid": str(row["uid"]), "version": row["version"]} for row in leads],
+            "survivor_uid": str(survivor_uid),
+            "loser_uid": str(loser_uid),
+            "survivor_version": survivor["version"],
+            "loser_version": loser["version"],
+            "field_resolutions": field_resolutions,
+            "proposed_contact": proposed,
+            "related_counts": counts,
+        }
+        plan_hash = hashlib.sha256(
+            json.dumps(
+                fingerprint,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode()
+        ).hexdigest()
+        preview = validate_payload(
+            "MergePreview",
+            {
+                "survivor_uid": str(survivor_uid),
+                "loser_uid": str(loser_uid),
+                "survivor_version": survivor["version"],
+                "loser_version": loser["version"],
+                "plan_hash": plan_hash,
+                "proposed_contact": proposed,
+                "related_counts": counts,
+                "warnings": [],
+            },
+        )
+        return preview
+
+    def _merge_context(self, survivor_uid, loser_uid):
         note = MODELS["note"].__tablename__
         task = MODELS["task"].__tablename__
         deal_contact = MODELS["deal_contact"].__tablename__
@@ -179,38 +214,7 @@ class ContactMerge(GovernedGateway):
             key: int(state[key])
             for key in ("notes", "tasks", "deals", "tags", "source_identities", "affiliations")
         }
-        fingerprint = {
-            "leads": [{"uid": str(row["uid"]), "version": row["version"]} for row in leads],
-            "survivor_uid": str(survivor_uid),
-            "loser_uid": str(loser_uid),
-            "survivor_version": survivor["version"],
-            "loser_version": loser["version"],
-            "field_resolutions": field_resolutions,
-            "proposed_contact": proposed,
-            "related_counts": counts,
-        }
-        plan_hash = hashlib.sha256(
-            json.dumps(
-                fingerprint,
-                sort_keys=True,
-                separators=(",", ":"),
-                ensure_ascii=False,
-            ).encode()
-        ).hexdigest()
-        preview = validate_payload(
-            "MergePreview",
-            {
-                "survivor_uid": str(survivor_uid),
-                "loser_uid": str(loser_uid),
-                "survivor_version": survivor["version"],
-                "loser_version": loser["version"],
-                "plan_hash": plan_hash,
-                "proposed_contact": proposed,
-                "related_counts": counts,
-                "warnings": [],
-            },
-        )
-        return preview
+        return counts, leads
 
     def merge_preview(
         self,

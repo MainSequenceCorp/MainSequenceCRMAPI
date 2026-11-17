@@ -29,7 +29,7 @@ def test_repeat_migrations_seed_and_provider_isolation(base_service):
     from src.erp.base.migrations import migration
 
     result = upgrade_application("src.erp.base.migrations:migration")
-    assert result["revision"] == "0001"
+    assert result["revision"] == "0002"
     assert seed(base_service) == {"countries": 0, "languages": 0, "currencies": 0}
     assert all(
         table.name.startswith("erp_base__") for table in migration.target_metadata.tables.values()

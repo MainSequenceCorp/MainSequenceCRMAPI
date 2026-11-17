@@ -79,7 +79,7 @@ Keep transport and persistence separate from these rules.
 
 Add MetaTable declarations in `src/erp/crm/metatables/campaigns.py` and register
 them in `src/erp/crm/metatables/__init__.py`. Add the next revision after current
-head `0012` under the existing `src.crm.migrations:migration` provider; confirm
+head `0012` under the existing `src.erp.crm.migrations:migration` provider; confirm
 the head again when implementation starts.
 
 - Store Campaign, Step, Transition, Participant and the one-to-one Prompt
@@ -285,7 +285,7 @@ Do not introduce manual grants or push/deploy as part of this planning task.
 | --- | --- |
 | Module configuration and bootstrap | `src/erp/crm/config.py`, `config/erp/crm/settings.yaml`, `src/erp/crm/services/application.py`, `api/erp/crm/main.py` |
 | Shared policy and operations | `src/erp/crm/platform/runtime.py`, `src/erp/crm/services/operations.py`, `api/erp/crm/service_adapter.py` |
-| Governed persistence | `src/erp/crm/repositories/gateway.py`, `src/erp/crm/repositories/resources/`, `src/erp/crm/metatables/__init__.py`, `src/crm/migrations/registry.py` |
+| Governed persistence | `src/erp/crm/repositories/gateway.py`, `src/erp/crm/repositories/resources/`, `src/erp/crm/metatables/__init__.py`, `src/erp/crm/migrations/registry.py` |
 | Core consistency | `src/erp/crm/repositories/tasks.py`, `src/erp/crm/repositories/resources/writes.py`, `src/erp/crm/repositories/contacts/merge.py`, `src/erp/crm/models/tasks.py`, `src/erp/crm/models/prompts.py` |
 | HTTP/MCP | `api/erp/crm/query_models.py`, `api/erp/crm/discovery.py`, `api/erp/crm/mcp_tools.py`, `api/erp/crm/mcp_server.py` |
 | Deployment and real-agent checks | `.mainsequence/workflows/crm-api.yaml`, `jobs/erp/crm/migrate.py`, `scripts/erp/crm/agent/verify_local_agent.py` |

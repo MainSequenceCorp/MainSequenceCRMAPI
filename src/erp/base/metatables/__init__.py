@@ -120,6 +120,16 @@ class Party(Record, PlatformManagedMetaTable, Base):
     __table_args__ = (
         CheckConstraint("kind IN ('person', 'organization')", name="ck_base_party_kind"),
     )
+    name: Mapped[str] = field("Name", "Full person name or organization name.", String(511))
+    identity: Mapped[dict] = field(
+        "Identity details", "Structured person or organization details; excludes sales-specific data.", JSON(), default=dict
+    )
+    consumers: Mapped[dict] = field(
+        "Consumers", "Registered module profiles and their active usage claims; managed by adoption commands.", JSON(), default=dict
+    )
+    provenance: Mapped[dict] = field(
+        "Provenance", "Original source timestamps and nullable actor identifiers preserved by controlled extraction.", JSON(), default=dict
+    )
     kind: Mapped[str] = field(
         "Kind", "Person or organization; immutable after creation.", String(20)
     )
@@ -146,6 +156,12 @@ class Affiliation(Record, PlatformManagedMetaTable, Base):
         ),
         CheckConstraint("person_uid != organization_uid", name="ck_base_affiliation_distinct"),
     )
+    status: Mapped[str] = field("Status", "Current, former or unknown relationship status.", String(10), default="unknown")
+    started_period: Mapped[str | None] = field("Start period", "Original start date precision: year, month or day.", String(10))
+    ended_period: Mapped[str | None] = field("End period", "Original end date precision: year, month or day.", String(10))
+    job_title: Mapped[str | None] = field("Job title", "Recorded job title; null means not supplied.", String(255))
+    consumers: Mapped[dict] = field("Consumers", "Registered module relationship projections.", JSON(), default=dict)
+    provenance: Mapped[dict] = field("Provenance", "Source timestamps and nullable actor identifiers.", JSON(), default=dict)
     person_uid: Mapped[UUID] = field(
         "Person",
         "Person participating in the affiliation.",

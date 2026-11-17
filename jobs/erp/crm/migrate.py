@@ -8,7 +8,7 @@ still has its physical contracts checked and catalog bindings reconciled.
 
 This repository owns one provider. Local development does not run this Job;
 it runs `metatables --local migrations upgrade --provider
-src.crm.migrations:migration` against the local SQLite runtime.
+src.erp.crm.migrations:migration` against the local SQLite runtime.
 """
 
 import logging
@@ -16,7 +16,7 @@ import logging
 from metatables import upgrade_application
 
 # Every provider this repository owns, in dependency order.
-PROVIDERS = ("src.crm.migrations:migration",)
+PROVIDERS = ("src.erp.crm.migrations:migration",)
 
 
 def main() -> None:

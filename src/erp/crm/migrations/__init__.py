@@ -5,7 +5,7 @@ from metatables.migrations import (
     build_metatable_migration_provider,
 )
 from src.erp.crm.metatables import Base
-from src.crm.migrations.registry import metatable_provider_models
+from src.erp.crm.migrations.registry import metatable_provider_models
 
 CodeRepositoryAlembicVersion = build_alembic_version_metatable(
     class_name="CodeRepositoryAlembicVersion",
@@ -16,10 +16,11 @@ CodeRepositoryAlembicVersion = build_alembic_version_metatable(
 )
 
 migration = build_metatable_migration_provider(
+    # Persisted catalog identity; independent of the provider's import location.
     package="src.crm",
     migration_namespace="mainsequence-crm",
-    script_location="src.crm.migrations:",
-    version_location_prefix="src.crm.migrations:versions",
+    script_location="src.erp.crm.migrations:",
+    version_location_prefix="src.erp.crm.migrations:versions",
     target_metadata=Base.metadata,
     alembic_registry=CodeRepositoryAlembicVersion,
     metatable_models=metatable_provider_models(),

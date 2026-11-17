@@ -4,6 +4,27 @@ See the [contact](../concepts/contacts.md) and
 [company](../concepts/companies.md) concepts for domain meaning. Every path
 below is under `/api/crm/v1/`.
 
+## Directory adoption
+
+After controlled activation with `CRM_BASE_ADOPTION=1`, Base owns shared identity;
+CRM's existing routes and UUIDs remain stable. Identity writes and CRM projections
+commit atomically in the same MetaTables DataSource. Directory edits advance the
+CRM version, so an old CRM `expected_version` returns `409`.
+
+`GET directory-adoption/` requires `crm.read` and returns `enabled` and
+`can_adopt`. `POST contacts/adopt/` and `POST companies/adopt/` require
+`crm.create` and accept exactly `party_uid` and positive integer
+`expected_party_version`. They return the existing Contact or Company response
+contract with `201`. Kind mismatch, archived identity, stale version or an
+existing CRM claim returns `409`; an incompatible CRM payload returns `422`.
+Adoption before activation returns `503`. A full unstructured Directory name is
+projected intact into CRM's first-name field; it is not guessed into name parts.
+
+The shared and CRM UUIDs are identical. Directory-only records do not become CRM
+profiles automatically. The command does not enroll a campaign or contact anyone.
+An uncertain response must be resolved by reading the existing identity/profile
+before retrying. New Agent/MCP tools are not part of this extension.
+
 ## Contacts
 
 | Method | Path | Body / behavior |

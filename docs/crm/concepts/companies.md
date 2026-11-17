@@ -26,3 +26,15 @@ visible after archival; new affiliations require an active company.
 
 See the [company API](../api/contacts-companies.md) for collection and command
 paths.
+
+## Shared Directory identity
+
+With Base adoption active, a Company is a CRM profile of a shared organization.
+Base owns its name, website and public links, main phone, tax identifier, logo and
+original postal-address text. CRM retains its sales owner, sector/size and sales
+annotations. Free-text countries are preserved without inventing geography
+references. Operating companies remain a separate Base resource linked to an
+organization identity. Existing CRM UUIDs and deal/contact links do not change.
+
+See [API adoption](../api/contacts-companies.md#directory-adoption) and the
+[local cutover procedure](../delivery/base-adoption.md).

@@ -177,7 +177,7 @@ def test_merge_unions_distinct_platforms_and_resolves_same_platform(monkeypatch)
 
 def test_migration_rejects_bad_legacy_url_before_schema_change(monkeypatch):
     migration = import_module(
-        "src.crm.migrations.versions.mainsequence_crm.0005_contact_social_links"
+        "src.erp.crm.migrations.versions.mainsequence_crm.0005_contact_social_links"
     )
     changes = []
 

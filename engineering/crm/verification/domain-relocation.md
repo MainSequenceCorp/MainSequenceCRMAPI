@@ -1,5 +1,19 @@
 # CRM domain relocation verification
 
+Follow-up cleanup, 2026-11-17: empty source and project-skill directories,
+old API/Job entrypoints, the forwarding plan page and duplicate agent resource
+projections were removed. Workflow and local callers now use domain paths
+directly. The provider is `src.erp.crm.migrations:migration`; its stored catalog
+identity remains `src.crm:mainsequence-crm`. All 15 revision bodies are unchanged.
+The SDK prompt and Agent Card each have one authoritative copy.
+
+Cleanup verification: 423 API tests and 32 frontend cases passed; strict MkDocs
+and frontend guide validation passed. A private local SQLite MetaTables runtime
+reached revision `0015` with 36 bindings, then reopened the same history without
+applying a migration. The built wheel contains the domain-owned provider and
+no old API/source packages. This follow-up is a local source change; the previous
+hosted deployment evidence below predates it.
+
 Date: 2026-11-17. Existing CRM code, tests, documentation and agent resources
 were relocated into domain-owned directories. No new business module, route,
 workflow, agent, migration revision or database schema was introduced.

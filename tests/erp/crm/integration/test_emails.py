@@ -281,7 +281,7 @@ def test_additive_provider_migration_and_email_read_in_fresh_process(email_postg
     import sys
     from alembic import command
     from metatables.migrations import alembic_config_for_provider
-    from src.crm.migrations import migration
+    from src.erp.crm.migrations import migration
     database = 'crm_email_migration_' + uuid.uuid4().hex
     with email_postgres.connect().execution_options(isolation_level='AUTOCOMMIT') as admin:
         admin.exec_driver_sql(f'CREATE DATABASE "{database}"')
@@ -292,7 +292,7 @@ def test_additive_provider_migration_and_email_read_in_fresh_process(email_postg
                 config.attributes['connection'] = db
                 command.upgrade(config, 'head')
                 db.commit()
-                assert db.exec_driver_sql('SELECT version_num FROM mainsequence_crm__alembic_version').scalar_one() == '0015'
+                assert db.exec_driver_sql('SELECT version_num FROM mainsequence_crm__alembic_version').scalar_one() == '0016'
                 stamp = datetime.now(UTC)
                 cid, iid, tid, mid, actor = (uuid.uuid4() for _ in range(5))
                 def version(uid):

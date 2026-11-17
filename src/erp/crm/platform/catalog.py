@@ -97,6 +97,10 @@ class CatalogRegistry:
 
     def validate(self) -> None:
         self.bindings
+        from ..base_adoption.runtime import enabled
+        if enabled():
+            from ..base_adoption.store import Store
+            Store(self, require_active=True).data_source_uid
 
     def validate_settings(self) -> None:
         """Require one initialized application-settings row."""

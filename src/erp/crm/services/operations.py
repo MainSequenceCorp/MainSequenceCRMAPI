@@ -191,6 +191,15 @@ class CRMOperations:
         self.context.require("crm.read")
         return self.resources.detail(resource, uid)
 
+    def adopt_party(self, resource, payload):
+        from ..base_adoption.models import AdoptParty
+        self.context.require("crm.create")
+        data = validated_model(AdoptParty, payload)
+        if resource not in ("contacts", "companies") or not hasattr(self.resources, "identity_resources"):
+            raise ServiceUnavailable("Directory adoption is not active")
+        return self.resources.identity_resources.adopt(resource, self.context.actor_uid,
+            data.party_uid, data.expected_party_version)
+
     def create_resource(self, resource: str, payload: dict[str, Any]) -> dict[str, Any]:
         self.context.require("crm.create")
         singular = RESOURCE_SPECS[resource].logical_table

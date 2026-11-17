@@ -21,7 +21,7 @@ def test_models_are_python_classes_not_runtime_json_definitions():
     assert {path.name for path in crm_root.glob("*.py")} == {
         "__init__.py", "config.py"
     }
-    assert (API / "src/crm/migrations/__init__.py").is_file()
+    assert (API / "src/erp/crm/migrations/__init__.py").is_file()
     assert (API / "src/agents/crm/discovery.py").is_file()
     for package in (
         "models",
@@ -37,7 +37,7 @@ def test_models_are_python_classes_not_runtime_json_definitions():
     assert not (API / "src/erp/crm/data_dictionary.json").exists()
     assert not (API / "src/erp/crm/crm-domain.schema.json").exists()
     assert not (API / "src/erp/crm/import-mapping.schema.json").exists()
-    assert len(MODELS) == 36
+    assert len(MODELS) == 37
     for logical_name, model in MODELS.items():
         expected_module = (
             "src.erp.crm.metatables.solution_selling"

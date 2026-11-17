@@ -39,10 +39,10 @@ def test_migration_job_upgrades_only_the_crm_provider(monkeypatch, capsys, migra
         return {"migrated": migrated, "revision": "0009", "data_source_uid": "source-uid"}
 
     monkeypatch.setattr(metatables, "upgrade_application", upgrade_application)
-    runpy.run_path(str(ROOT / "jobs" / "migrate_crm.py"), run_name="__main__")
-    assert calls == ["src.crm.migrations:migration"]
+    runpy.run_path(str(ROOT / "jobs" / "erp" / "crm" / "migrate.py"), run_name="__main__")
+    assert calls == ["src.erp.crm.migrations:migration"]
     assert capsys.readouterr().out == (
-        f"src.crm.migrations:migration: 0009 ({state}; catalog reconciled) on source-uid\n"
+        f"src.erp.crm.migrations:migration: 0009 ({state}; catalog reconciled) on source-uid\n"
     )
 
 
@@ -52,7 +52,7 @@ def test_migration_job_propagates_finalization_failure(monkeypatch, capsys):
 
     monkeypatch.setattr(metatables, "upgrade_application", upgrade_application)
     with pytest.raises(RuntimeError, match="physical_table_missing"):
-        runpy.run_path(str(ROOT / "jobs" / "migrate_crm.py"), run_name="__main__")
+        runpy.run_path(str(ROOT / "jobs" / "erp" / "crm" / "migrate.py"), run_name="__main__")
     assert capsys.readouterr().out == ""
 
 
@@ -132,7 +132,7 @@ def test_every_runtime_waits_for_the_migration_and_scheduled_jobs_stay_out():
 def test_the_assistant_kept_its_declaration_when_it_moved_into_this_file():
     resources = {item["key"]: item for item in _workflow()["resources"]}
     assert resources["crm-assistant"]["spec"] == {
-        "source_path": "api/tau/main.py",
+        "source_path": "api/agents/crm/main.py",
         "mcp_applications": [{"resource": "crm"}],
         "llm_provider": "openai-codex",
         "llm_model": "gpt-5.6-luna",

@@ -12,8 +12,8 @@ and the maintained documentation for the affected surface. Paths below are
 relative to the named checkout; API and frontend are separate repositories.
 
 - API: `docs/crm/concepts/assistant.md`, `docs/crm/api/mcp.md`,
-  `docs/crm/crm_core/adrs/0005-crm-application-mcp.md`, `.tau/domains/crm/SYSTEM.md`,
-  `api/erp/crm/mcp_tools.py`, `api/tau/`, and `tests/erp/crm/agent/test_tau_runtime.py`.
+  `docs/crm/crm_core/adrs/0005-crm-application-mcp.md`, `.tau/SYSTEM.md`,
+  `api/erp/crm/mcp_tools.py`, `api/agents/crm/`, and `tests/erp/crm/agent/test_tau_runtime.py`.
 
 Read the matching installed SDK skills. Main Sequence and Tau guidance lives
 in the API checkout; Command Center guidance lives in the frontend checkout.

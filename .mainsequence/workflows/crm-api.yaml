@@ -11,7 +11,7 @@ resources:
         - repository: MetaTables
           policy: reader
     spec:
-      source_path: api/crm/main.py
+      source_path: api/erp/crm/main.py
       mcp_enabled: true
       cpu_request: "0.5"
       memory_request: 1Gi
@@ -36,7 +36,7 @@ resources:
     spec:
       name: CRM migrations
       description: Applies the CRM MetaTables migrations before the CRM API and assistant roll out.
-      execution_path: jobs/migrate_crm.py
+      execution_path: jobs/erp/crm/migrate.py
       cpu_request: "0.5"
       memory_request: "1"
       max_runtime_seconds: 1800
@@ -53,7 +53,7 @@ resources:
         - key: crm
           policy: user
     spec:
-      source_path: api/tau/main.py
+      source_path: api/agents/crm/main.py
       mcp_applications:
         - resource: crm
       command_center_icon:

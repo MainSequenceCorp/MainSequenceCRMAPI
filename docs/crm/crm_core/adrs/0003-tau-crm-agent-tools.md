@@ -45,7 +45,7 @@ different purposes.
 ### Runtime answer and prompt boundary
 
 The deployed Agent Card names the assistant but does not supply its conversation
-instructions. Tau loads this repository's `.tau/domains/crm/SYSTEM.md` as its runtime
+instructions. Tau loads this repository's `.tau/SYSTEM.md` as its runtime
 system prompt, replacing the SDK's general default. That prompt defines the
 in-app CRM role, response style, supported business workflows, and how to
 ground record claims in tool results. The assistant does not advertise coding
@@ -229,7 +229,7 @@ extension declares 46 typed tools with the optional module disabled: core
 list/get/create/update, Activity and Pipeline reads, Interaction CRUD,
 affiliations, settings, task completion, deal movement, and merge preview.
 It adds 20 Solution Selling tools when that module is enabled. The extension
-uses `api/tau/crm_tools.py` to translate schema input and safe results; it
+uses `api/agents/crm/crm_tools.py` to translate schema input and safe results; it
 calls only `CRMOperations`. Mutation tools run sequentially and report an
 unknown outcome if cancellation arrives during an in-flight write. Tool
 output is capped at 128,000 characters; an oversized result asks the agent to

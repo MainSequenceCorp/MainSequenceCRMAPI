@@ -1,0 +1,9 @@
+site_name: Website and commerce API
+site_url: http://127.0.0.1/docs/commerce/
+docs_dir: ../../docs/commerce
+site_dir: ../../.local/docs/commerce
+nav:
+  - Overview: index.md
+  - Concepts: concepts.md
+  - API: api.md
+  - Local operations: delivery.md

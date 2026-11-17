@@ -1,0 +1,51 @@
+# Inert candidate: outside .mainsequence/workflows. Not platform-validated or approved.
+# Validate target branch and access, then obtain user approval before activation.
+api_version: "3.0.0"
+name: commerce-api
+resources:
+  - key: commerce
+    kind: fastapi
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      source_path: api/erp/commerce/main.py
+      mcp_enabled: false
+      cpu_request: "0.5"
+      memory_request: 1Gi
+      spot: false
+      automatic_deployment: true
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-commerce$'
+      revision_retention_count: 3
+  - key: migrate-commerce
+    kind: job
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      name: Website and commerce migrations
+      description: Apply only Website and commerce migrations before Website and commerce API activation.
+      execution_path: jobs/erp/commerce/migrate.py
+      cpu_request: "0.5"
+      memory_request: "1"
+      max_runtime_seconds: 1800
+      spot: false
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-commerce$'
+execution:
+  steps:
+    image:
+      prepare_image: commerce
+    migrate:
+      run_job: migrate-commerce
+      image_from: image
+      needs: [image]
+    deploy_api:
+      deploy: commerce
+      image_from: image
+      needs: [migrate]

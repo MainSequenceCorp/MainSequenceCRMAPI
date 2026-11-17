@@ -65,3 +65,10 @@ then returns guarded Sales statements plus its audit event for an atomic
 same-DataSource transaction. Finance never imports Sales table models or writes
 Sales tables independently. `attach` still executes that same plan for existing
 callers. A failed Finance invoice insert rolls back the Sales link and version.
+
+Commerce uses Sales' public `plan_commerce_checkout` (ADR 0002): independently requires
+sales.write/configure, validates active Base/Catalog references and exact service terms,
+and returns the entire confirmed order, lines and audit plan. Commerce joins it to
+its grant/publication fences and Checkout insert on the same source. The existing
+related-record map carries commerce:<checkout UUID>; no Sales DDL change. Public
+customers cannot submit prices or confirmed Sales state directly.

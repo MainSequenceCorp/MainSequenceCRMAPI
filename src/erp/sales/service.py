@@ -357,3 +357,41 @@ class Service:
         if steps:
             self.transact(steps)
         return self.get(uid)
+
+    def plan_commerce_checkout(self, payload, *, request_uid, checkout_uid):
+        """Complete Sales-owned confirmed service order plan, joined atomically by Commerce."""
+        self.require("sales.write")
+        self.require("sales.configure")
+        data = OrderInput.model_validate(payload)
+        if (
+            not data.lines
+            or data.crm_deal_uid
+            or data.valid_until
+            or any(Decimal(x.discount) for x in data.lines)
+        ):
+            raise SalesError(
+                422,
+                "checkout_terms",
+                "Checkout requires nonempty service lines without opportunity, expiry or discounts",
+            )
+        uid, checkout = UUID(str(request_uid)), UUID(str(checkout_uid))
+        values, lines = self.prepare(data, uid)
+        if any(line["snapshot"]["kind"] != "service" for line in lines):
+            raise SalesError(422, "checkout_services", "This checkout supports services only")
+        timestamp = datetime.now(timezone.utc)
+        values.update(
+            uid=uid,
+            state="confirmed",
+            version=1,
+            downstream={f"commerce:{checkout}": True},
+            created_at=timestamp,
+            updated_at=timestamp,
+            confirmed_at=timestamp,
+            created_by_uid=self.actor_uid,
+            updated_by_uid=self.actor_uid,
+        )
+        return {**values, "lines": lines}, [
+            insert(Order).values(values),
+            insert(OrderLine).values(lines),
+            self.audit(uid, "commerce-checkout", 1, values.keys()),
+        ]

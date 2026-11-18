@@ -30,6 +30,8 @@ from src.erp.finance.schemas import (
 )
 from src.erp.finance.service import Service
 from src.erp.finance.store import Store
+from src.erp.module_access import module_available
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 
 from .identity import actor_and_capabilities
@@ -90,7 +92,7 @@ def discovery(resource):
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     resolve_modules(["base", "finance"] if enabled else [])
     app = FastAPI(title="Finance API", version="0.1.0")
     app.state.finance_store = Store(local_only=local)
@@ -149,7 +151,7 @@ def create_app(*, enabled=True, local=False):
                 "data_source_uid": current.store.data_source_uid,
                 "dependencies": current.dependencies.ready(),
                 "capabilities": sorted(current.capabilities),
-                "sales_enabled": current.dependencies.sales_factory is not None,
+                "sales_enabled": module_available("sales") and current.dependencies.sales_factory is not None,
             }
 
         @app.get(PREFIX + "/references/{resource}/")
@@ -271,7 +273,9 @@ def create_app(*, enabled=True, local=False):
 
         mount("invoices", InvoiceCreate, InvoiceUpdate)
         mount("payments", PaymentCreate, PaymentUpdate)
-    install_request_identity(app)
+    install_module_admission(app, "finance")
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

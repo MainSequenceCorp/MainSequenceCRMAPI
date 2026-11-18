@@ -38,7 +38,6 @@ from .main import create_app as create_crm_app
 
 LOCAL_SIGN_IN_TIMEOUT_SECONDS = 20
 LOCAL_SIGN_IN_CACHE_SECONDS = 300
-# The deployment's public ingress in .mainsequence/workflows/crm-api.yaml.
 GOOGLE_PUBLIC_ROUTES = (
     ("GET", "/extensions/google/oauth/callback/"),
     ("GET", "/extensions/google/oauth/done/"),
@@ -53,6 +52,7 @@ CALLER_HEADERS = frozenset(
         b"x-user-id",
         b"x-user-uid",
         b"x-username",
+        b"x-organization-environment-uid",
     }
 )
 
@@ -67,12 +67,7 @@ def _is_loopback(request: Request) -> bool:
 
 
 def _anonymous_routes() -> tuple[tuple[str, str], ...]:
-    """Routes served without the local sign-in.
-
-    ``/healthz`` checks only the process. The Google callback and completion
-    page are anonymous in the deployed API too; they exist while the module is
-    active.
-    """
+    """Allow the loopback health probe and the enabled Google callback."""
     google = GOOGLE_PUBLIC_ROUTES if google_workspace_enabled() else ()
     return (("GET", "/healthz"), *google)
 
@@ -134,14 +129,21 @@ def _sign_in_failure(request: Request, stage: str, error: Exception) -> JSONResp
     return JSONResponse(_error(request, code, message), status_code=status)
 
 
-def create_app() -> FastAPI:
-    anonymous = _anonymous_routes()
-    with _public_ingress(anonymous):
-        application = create_crm_app()
-    if application.state.mainsequence_request_identity["mode"] != "local":
-        raise RuntimeError(
-            "The loopback CRM launcher runs only outside a Main Sequence deployment."
+def _loopback_url_host(url: str) -> bool:
+    try:
+        parsed = urlsplit(url)
+        host = parsed.hostname
+        return parsed.scheme in {"http", "https"} and (
+            host == "localhost" or (bool(host) and ipaddress.ip_address(host).is_loopback)
         )
+    except ValueError:
+        return False
+
+
+def install_local_identity(application: FastAPI, *, shared_erp: bool = False) -> None:
+    anonymous = _anonymous_routes()
+    if application.state.mainsequence_request_identity["mode"] != "local":
+        raise RuntimeError("The loopback launcher runs only outside a Main Sequence deployment.")
     signed_user_lock = Lock()
     signed_user_cache = None
     signed_user_expires_at = 0.0
@@ -154,7 +156,9 @@ def create_app() -> FastAPI:
             if signed_user_cache is not None and time.monotonic() < signed_user_expires_at:
                 return signed_user_cache
             if signed_user_future is None or signed_user_future.done():
-                signed_user_future = signed_user_executor.submit(User.get_authenticated_user_details)
+                signed_user_future = signed_user_executor.submit(
+                    User.get_authenticated_user_details
+                )
             pending = signed_user_future
         signed_user = await asyncio.wait_for(
             asyncio.wrap_future(pending), timeout=LOCAL_SIGN_IN_TIMEOUT_SECONDS
@@ -171,17 +175,31 @@ def create_app() -> FastAPI:
     origin = os.environ.get("CRM_LOCAL_TAU_ORIGIN", "")
     if origin:
         parsed = urlsplit(origin)
-        if (parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost"}
-                or parsed.port is None or parsed.path or parsed.query or parsed.fragment
-                or parsed.username or parsed.password):
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname not in {"127.0.0.1", "localhost"}
+            or parsed.port is None
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+            or parsed.username
+            or parsed.password
+        ):
             raise RuntimeError("CRM_LOCAL_TAU_ORIGIN must be a loopback HTTP origin")
         application.state.crm_local_tau_origin = origin.rstrip("/")
 
     @application.middleware("http")
     async def local_signed_user(request: Request, call_next):
-        if not _is_loopback(request):
+        origin = request.headers.get("origin")
+        if not _is_loopback(request) or (
+            shared_erp
+            and (
+                not _loopback_url_host(str(request.url))
+                or (origin and not _loopback_url_host(origin))
+            )
+        ):
             return JSONResponse(
-                {"detail": "Local CRM accepts loopback requests only."}, status_code=403
+                {"detail": "The local API accepts loopback requests only."}, status_code=403
             )
         headers = [
             (name, value)
@@ -197,8 +215,15 @@ def create_app() -> FastAPI:
                 {"detail": "Local CRM does not accept caller identity headers."}, status_code=401
             )
         stage = "local-sign-in-user"
+        path = request.scope["path"]
+        uses_crm = (
+            not shared_erp
+            or path == "/mcp"
+            or path.startswith(("/api/crm/", "/extensions/", "/mcp/"))
+        )
         try:
-            signed_user = await locally_signed_user()
+            if uses_crm:
+                signed_user = await locally_signed_user()
             stage = "local-sign-in-token"
             authorization = await asyncio.wait_for(
                 asyncio.to_thread(_signed_in_authorization),
@@ -206,21 +231,22 @@ def create_app() -> FastAPI:
             )
         except Exception as error:
             return _sign_in_failure(request, stage, error)
-        registry = configured_registry()
-        request.state.crm_registry = registry
-        try:
-            policy, directory, bootstrap = build_local_services(
-                signed_user=signed_user,
-                registry=registry,
-            )
-        except Exception:
-            return JSONResponse(
-                {"detail": "The local CRM dataset is unavailable."},
-                status_code=503,
-            )
-        request.state.crm_policy = policy
-        request.state.crm_directory = directory
-        request.state.crm_bootstrap = bootstrap
+        if uses_crm:
+            try:
+                registry = configured_registry()
+                policy, directory, bootstrap = build_local_services(
+                    signed_user=signed_user,
+                    registry=registry,
+                )
+            except Exception:
+                return JSONResponse(
+                    {"detail": "The local CRM dataset is unavailable."},
+                    status_code=503,
+                )
+            request.state.crm_registry = registry
+            request.state.crm_policy = policy
+            request.state.crm_directory = directory
+            request.state.crm_bootstrap = bootstrap
         # The installed request identity verifies this credential with
         # MAINSEQUENCE_ENDPOINT/api/v1/users/me/, binds that user as the caller
         # and removes the header before any route runs. The local policy grants
@@ -228,6 +254,11 @@ def create_app() -> FastAPI:
         request.scope["headers"] = [*headers, (b"authorization", authorization)]
         return await call_next(request)
 
+
+def create_app() -> FastAPI:
+    with _public_ingress(_anonymous_routes()):
+        application = create_crm_app()
+    install_local_identity(application)
     return application
 
 

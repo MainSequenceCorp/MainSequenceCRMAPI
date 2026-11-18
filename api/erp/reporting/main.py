@@ -8,6 +8,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 
 from mainsequence.server.fastapi import install_request_identity
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 from src.erp.reporting.errors import ReportingError
 from src.erp.reporting.schemas import (
@@ -111,7 +112,7 @@ def discovery(resource):
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     resolve_modules(["reporting"] if enabled else [])
     app = FastAPI(title="Reporting and automation API", version="0.1.0")
     app.state.reporting_store = Store(local_only=local)
@@ -302,5 +303,7 @@ def create_app(*, enabled=True, local=False):
         def detail(resource: Resource, uid: UUID):
             return current().get(resource, uid)
 
-    install_request_identity(app)
+    install_module_admission(app, "reporting")
+    if install_identity:
+        install_request_identity(app)
     return app

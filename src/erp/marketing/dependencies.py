@@ -7,6 +7,8 @@ from uuid import UUID
 
 import httpx
 
+from src.erp.module_access import module_available, require_module
+
 from .errors import MarketingError
 
 
@@ -29,9 +31,14 @@ class Dependencies:
 
     @property
     def crm_enabled(self):
-        return self.local and os.environ.get("MARKETING_CRM_ENABLED", "true") != "false"
+        return (
+            self.local
+            and module_available("crm")
+            and os.environ.get("MARKETING_CRM_ENABLED", "true") != "false"
+        )
 
     def crm(self, path, *, params=None):
+        require_module("crm")
         if not self.crm_enabled:
             raise MarketingError(
                 503,

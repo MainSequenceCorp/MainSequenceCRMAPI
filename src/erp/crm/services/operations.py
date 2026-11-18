@@ -12,6 +12,8 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from src.erp.module_access import require_module
+
 from ..contracts import (
     DomainValidationError,
     model_for,
@@ -117,6 +119,7 @@ class CRMContext:
     directory: DirectoryPort
 
     def require(self, capability: str) -> None:
+        require_module("crm")
         with observe_stage("permissions"):
             try:
                 capabilities = frozenset(self.policy.capabilities(self.actor_uid))

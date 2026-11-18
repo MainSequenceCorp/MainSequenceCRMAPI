@@ -10,6 +10,7 @@ from sqlalchemy import func, insert, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.module_access import require_module
 
 from .errors import ReportingError
 from .metatables import RESOURCES, AuditEvent, Definition, Run, RunStep, Schedule
@@ -40,6 +41,7 @@ class Service:
         )
 
     def require(self, cap):
+        require_module("reporting")
         if cap not in self.capabilities:
             raise ReportingError(
                 403, "forbidden", "Reporting access does not permit this operation"
@@ -379,6 +381,7 @@ class Service:
                 "source_limit": "source_limit: Narrow the saved search and create a new run.",
                 "source_changed": "source_changed: Retry this step after source edits settle.",
                 "source_disabled": "source_disabled: Enable the source module, then retry.",
+                "module_disabled": "source_disabled: Activate the source module, then retry.",
                 "source_mismatch": "source_mismatch: Correct the source configuration before retrying.",
             }.get(
                 e.code,

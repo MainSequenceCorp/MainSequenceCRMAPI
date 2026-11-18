@@ -30,6 +30,8 @@ from src.erp.inventory.schemas import (
 )
 from src.erp.inventory.service import Service
 from src.erp.inventory.store import Store
+from src.erp.module_access import module_available
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 
 from .identity import actor_and_capabilities
@@ -115,7 +117,7 @@ def discovery(resource):
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     resolve_modules(["base", "catalog", "inventory"] if enabled else [])
     app = FastAPI(title="Inventory API", version="0.1.0")
     app.state.inventory_store = Store(local_only=local)
@@ -180,8 +182,8 @@ def create_app(*, enabled=True, local=False):
                 "capabilities": sorted(svc.capabilities),
                 "data_source_uid": source,
                 "prerequisites": svc.dependencies.ready(),
-                "sales_enabled": svc.dependencies.sales_factory is not None,
-                "finance_enabled": svc.dependencies.finance_factory is not None,
+                "sales_enabled": module_available("sales") and svc.dependencies.sales_factory is not None,
+                "finance_enabled": module_available("finance") and svc.dependencies.finance_factory is not None,
             }
 
         @app.get(PREFIX + "/references/{resource}/")
@@ -293,7 +295,9 @@ def create_app(*, enabled=True, local=False):
         ):
             return service().history(resource, uid, page_index=page_index, page_size=page_size)
 
-    install_request_identity(app)
+    install_module_admission(app, "inventory")
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

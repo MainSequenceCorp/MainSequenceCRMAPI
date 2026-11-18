@@ -32,6 +32,5 @@ as `src.erp.crm.migrations:migration`. Its persisted catalog identity remains
 `src.crm:mainsequence-crm`; all revision and table identities remain unchanged.
 Configuration is packaged under `config/erp/crm/settings.yaml`.
 
-Run `.venv/bin/python -m pytest`, `.venv/bin/mkdocs build --strict` and
-`.venv/bin/python scripts/erp/crm/agent/verify_local_agent.py` from the root.
-The actual provider/MCP/history gate remains mandatory before pushing.
+Run `.venv/bin/python -m pytest` and `.venv/bin/mkdocs build --strict` from the
+root. The pre-push hook checks the committed API and documentation locally.

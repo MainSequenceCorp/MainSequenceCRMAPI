@@ -13,6 +13,8 @@ from mainsequence.server.fastapi import install_request_identity
 from src.erp.base.service import BaseError
 from src.erp.base.service import Service as BaseService
 from src.erp.base.store import Store as BaseStore
+from src.erp.module_access import module_available
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 from src.erp.projects.dependencies import Dependencies
 from src.erp.projects.errors import ProjectsError
@@ -101,7 +103,7 @@ def discovery(resource):
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     resolve_modules(["base", "projects"] if enabled else [])
     app = FastAPI(title="Projects and services API", version="0.1.0")
     app.state.projects_store = Store(local_only=local)
@@ -170,8 +172,8 @@ def create_app(*, enabled=True, local=False):
                 "data_source_uid": svc.store.data_source_uid,
                 "dependencies": svc.dependencies.ready(),
                 "capabilities": sorted(svc.capabilities),
-                "sales_enabled": svc.dependencies.sales_factory is not None,
-                "finance_enabled": svc.dependencies.finance_factory is not None,
+                "sales_enabled": module_available("sales") and svc.dependencies.sales_factory is not None,
+                "finance_enabled": module_available("finance") and svc.dependencies.finance_factory is not None,
             }
 
         @app.get(PREFIX + "/references/{resource}/")
@@ -312,7 +314,9 @@ def create_app(*, enabled=True, local=False):
 
         for resource in ["projects", "tasks"]:
             mount(resource)
-    install_request_identity(app)
+    install_module_admission(app, "projects")
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

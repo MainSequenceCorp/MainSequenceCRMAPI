@@ -28,6 +28,7 @@ from src.erp.marketing.schemas import (
 )
 from src.erp.marketing.service import Service
 from src.erp.marketing.store import Store
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 
 from .identity import actor_and_capabilities
@@ -95,7 +96,7 @@ def discovery(resource):
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     resolve_modules(["base", "marketing"] if enabled else [])
     app = FastAPI(title="Marketing API", version="0.1.0")
     app.state.marketing_store = Store(local_only=local)
@@ -294,7 +295,9 @@ def create_app(*, enabled=True, local=False):
         ):
             return service().history(resource, uid, page_index=page_index, page_size=page_size)
 
-    install_request_identity(app)
+    install_module_admission(app, "marketing")
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

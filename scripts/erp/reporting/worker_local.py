@@ -12,7 +12,7 @@ from src.erp.reporting.store import require_local_runtime
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-uid", required=True)
-    parser.add_argument("--port", type=int, default=38771)
+    parser.add_argument("--port", type=int, default=38641)
     parser.add_argument("--poll-seconds", type=int, default=5, choices=range(1, 16))
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()

@@ -75,7 +75,7 @@ def discovery(resource):
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     modules = resolve_modules(["base"] if enabled else [])
     app = FastAPI(title="ERP Base API", version="0.1.0")
     app.state.base_store = Store(local_only=local)
@@ -267,7 +267,8 @@ def create_app(*, enabled=True, local=False):
                 )
             }
 
-    install_request_identity(app)
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

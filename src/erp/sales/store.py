@@ -4,6 +4,7 @@ from functools import cached_property
 
 from metatables import MetaTable, get_runtime_status
 from metatables.compiled_sql.v1 import compile_sqlalchemy_statement, compile_sqlalchemy_statements
+from src.erp.module_access import execute_write, guard_write
 from src.erp.sales.metatables import MODELS
 
 
@@ -75,9 +76,9 @@ class Store:
     def write(self, statements):
         if self.local_only and str(require_local_runtime()) != self.data_source_uid:
             raise RuntimeError("Local DataSource changed; restart Sales before writing")
-        result = MetaTable.execute_transaction(
+        result = execute_write(
             compile_sqlalchemy_statements(
-                statements,
+                guard_write("sales", self.data_source_uid, statements),
                 operation="update",
                 data_source_uid=self.data_source_uid,
                 limits={"max_rows": 100, "statement_timeout_ms": 10000},

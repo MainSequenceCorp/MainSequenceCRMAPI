@@ -299,8 +299,8 @@ the isolated local agent gate validate real persisted SQLite settings before
 the hosted migration Job has published new model bindings.
 The workflow retains automatic promotion and its migration-before-deploy graph.
 The former `DISABLED-until-orchestrator-push` transport gate was removed after
-the user confirmed the Production Writer grant was resolved; the required
-real-agent pre-push hook remains enabled. A tested
+the user confirmed the Production Writer grant was resolved. The current
+pre-push hook runs local API and documentation checks. A tested
 provisioning variant with initial automatic deployment disabled was rejected
 by the backend because new services then require pinned image UIDs; that
 invalid variant was not committed or pushed.

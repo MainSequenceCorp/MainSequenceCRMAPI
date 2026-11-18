@@ -13,6 +13,8 @@ import uuid
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import yaml
+
 from mainsequence.client import ResourceRelease
 from mainsequence.code_repository_context import get_code_repository_context
 
@@ -48,10 +50,19 @@ def active_binding(context, releases) -> dict[str, str]:
 
 def bind_workflow(path: Path, binding: dict[str, str], *, apply: bool) -> bool:
     source = path.read_text(encoding="utf-8")
-    pattern = r"(?m)^(\s*VITE_CRM_FASTAPI_RELEASE_UID:\s*)[^\n]+$"
+    workflow = yaml.safe_load(source)
+    for resource in workflow.get("resources", ()):
+        if resource.get("key") != "crm-site":
+            continue
+        build_environment = resource.get("spec", {}).get("build_environment", {})
+        if build_environment.get("VITE_ERP_FASTAPI_RELEASE_UID") == {
+            "resource_release": {"repository": "MainSequenceCRMAPI", "key": "crm"}
+        }:
+            return False
+    pattern = r"(?m)^([ \t]*VITE_(?:ERP|CRM)_FASTAPI_RELEASE_UID:[ \t]+)\S[^\r\n]*$"
     updated, count = re.subn(pattern, lambda match: match[1] + binding["release_uid"], source)
     if count != 1:
-        raise RuntimeError("Expected one CRM API release binding in the frontend workflow")
+        raise RuntimeError("Expected a shared ERP API release binding in the frontend workflow")
     changed = updated != source
     if changed and apply:
         path.write_text(updated, encoding="utf-8")

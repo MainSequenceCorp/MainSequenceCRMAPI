@@ -1,5 +1,6 @@
 """Owned local CRM adoption/read fixture; production Marketing never writes CRM."""
 
+import os
 from contextlib import contextmanager
 from uuid import UUID, uuid4
 
@@ -20,7 +21,10 @@ def crm_followup_fixture(svc, party):
     contact_uid = UUID(party["uid"])
     task_uid = uuid4()
     try:
-        with httpx.Client(base_url="http://127.0.0.1:38641/api/crm/v1/", timeout=30) as client:
+        origin = os.environ.get("MARKETING_LOCAL_CRM_ORIGIN", "http://127.0.0.1:38641")
+        url = httpx.URL(origin)
+        assert url.scheme == "http" and url.host in {"127.0.0.1", "localhost", "::1"}
+        with httpx.Client(base_url=origin.rstrip("/") + "/api/crm/v1/", timeout=30) as client:
             response = client.post(
                 "contacts/adopt/",
                 json={"party_uid": str(contact_uid), "expected_party_version": party["version"]},

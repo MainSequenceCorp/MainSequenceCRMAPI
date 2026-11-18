@@ -6,6 +6,7 @@ import json
 import time
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import UUID
 
 import jwt
 import pytest
@@ -121,7 +122,27 @@ class SignedCaller:
 
 
 @pytest.fixture
-def signed_caller(monkeypatch):
+def hosted_crm_activation(monkeypatch):
+    """Provide ERP policy for tests that simulate hosted CRM and mock storage."""
+    monkeypatch.setenv("ERP_USER_PREFERENCES_PROVISIONED_MODULES", "base,crm")
+
+    def require_active(scope, module_keys, *, local):
+        assert scope == UUID(ENVIRONMENT_UID) and not local
+        assert set(module_keys) <= {"base", "crm"}
+        return {"version": 1, "active_module_keys": ["crm"]}
+
+    def guard_active(scope, module_keys, _source_uid, *, local, policy_version):
+        assert policy_version == require_active(scope, module_keys, local=local)["version"]
+        # These tests assert CRM statement shape against fake storage. Actual
+        # same-source admission transactions are tested by User Preferences.
+        return []
+
+    monkeypatch.setattr("src.erp.user_preferences.admission.require_active", require_active)
+    monkeypatch.setattr("src.erp.user_preferences.admission.guard_active", guard_active)
+
+
+@pytest.fixture
+def signed_caller(monkeypatch, hosted_crm_activation):
     """Deploy the app's caller verification and sign each request's caller assertion.
 
     The environment is what Main Sequence gives a deployed release. Only the

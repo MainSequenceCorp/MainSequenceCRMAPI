@@ -23,6 +23,8 @@ from src.erp.commerce.schemas import (
     VersionInput,
 )
 from src.erp.commerce.store import Store
+from src.erp.module_access import module_available
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 
 from .services import enabled, service
@@ -114,7 +116,7 @@ def install_errors(app):
         )
 
 
-def create_app(*, enabled_module=True, local=False):
+def create_app(*, enabled_module=True, local=False, install_identity=True):
     resolve_modules(["base", "catalog", "commerce"] if enabled_module else [])
     app = FastAPI(title="Website and commerce API", version="0.1.0")
     app.state.commerce_store = Store(local_only=local)
@@ -143,8 +145,8 @@ def create_app(*, enabled_module=True, local=False):
                 "data_source_uid": s.store.data_source_uid,
                 "dependencies": s.dependencies.ready(),
                 "capabilities": sorted(s.capabilities),
-                "sales_enabled": enabled("sales"),
-                "finance_enabled": enabled("finance"),
+                "sales_enabled": module_available("sales") and enabled("sales"),
+                "finance_enabled": module_available("finance") and enabled("finance"),
             }
 
         @app.get(PREFIX + "/resources/")
@@ -285,7 +287,9 @@ def create_app(*, enabled_module=True, local=False):
         def detail(resource: Resource, uid: UUID):
             return current().get(resource, uid)
 
-    install_request_identity(app)
+    install_module_admission(app, "commerce")
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -260,7 +261,10 @@ def test_optional_crm_link_with_actual_adopted_company(business, monkeypatch):
     fixture_store = CrmStore(configured_registry())
     assert str(fixture_store.data_source_uid) == str(svc.store.data_source_uid)
     pipeline_uid, stage_uid, deal_uid = uuid4(), uuid4(), uuid4()
-    with httpx.Client(base_url="http://127.0.0.1:38641/api/crm/v1/", timeout=30) as client:
+    origin = os.environ.get("SALES_LOCAL_CRM_ORIGIN", "http://127.0.0.1:38641")
+    url = httpx.URL(origin)
+    assert url.scheme == "http" and url.host in {"127.0.0.1", "localhost", "::1"}
+    with httpx.Client(base_url=origin.rstrip("/") + "/api/crm/v1/", timeout=30) as client:
         try:
             adopted = client.post(
                 "companies/adopt/",

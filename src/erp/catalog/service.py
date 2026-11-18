@@ -12,6 +12,7 @@ from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
 from src.erp.catalog.metatables import RESOURCES, AuditEvent, Category, Item, Unit, UnitGroup
 from src.erp.catalog.schemas import INPUTS, ConvertInput
+from src.erp.module_access import require_module
 
 
 class CatalogError(Exception):
@@ -29,6 +30,7 @@ class Service:
         )
 
     def require(self, capability):
+        require_module("catalog")
         if capability not in self.capabilities:
             raise CatalogError(403, "forbidden", "Catalog access does not permit this operation")
 

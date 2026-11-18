@@ -8,8 +8,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from api.erp.crm.affiliation_routes import router as affiliation_router
-from api.erp.crm.email_routes import router as email_router
 from api.erp.crm.campaign_routes import router as campaign_router
+from api.erp.crm.email_routes import router as email_router
 from api.erp.crm.google_routes import mount_public_routes as mount_google_public_routes
 from api.erp.crm.google_routes import router as google_router
 from api.erp.crm.mcp_server import install_crm_mcp
@@ -27,13 +27,13 @@ from src.erp.crm.platform.hosted_runtime import install_platform_services
 from src.erp.crm.platform.readiness_errors import report_readiness_failure
 from src.erp.crm.platform.runtime import authenticated_actor, readiness, request_port
 from src.erp.crm.solution_selling.config import solution_selling_enabled
+from src.erp.module_access.http import install_module_admission
 
 BOOTSTRAP_STAGE_TIMEOUT_SECONDS = 75
 
 
-def create_app() -> FastAPI:
+def install_crm_http(application: FastAPI, *, policy_exempt=()) -> None:
     crm_config()  # Fail before route mounting if the persisted configuration is invalid.
-    application = FastAPI(title="Main Sequence CRM", version="0.1.0")
     application.state.crm_local_tau_origin = None
     install_platform_services(application)
 
@@ -64,7 +64,6 @@ def create_app() -> FastAPI:
             status_code=422,
         )
 
-    application.add_api_route("/healthz", healthz, methods=["GET"])
     application.add_api_route("/api/crm/v1/readiness/", crm_readiness, methods=["GET"])
     application.add_api_route("/api/crm/v1/bootstrap/", bootstrap, methods=["GET"])
     application.include_router(crm_router)
@@ -84,6 +83,13 @@ def create_app() -> FastAPI:
     # routes can be checked and caller verification runs before any CRM
     # middleware or route: a platform-signed caller assertion when deployed, a
     # direct Bearer token locally. authenticated_actor() reads the result.
+    install_module_admission(application, "crm", policy_exempt=policy_exempt)
+
+
+def create_app() -> FastAPI:
+    application = FastAPI(title="Main Sequence CRM", version="0.1.0")
+    application.add_api_route("/healthz", healthz, methods=["GET"])
+    install_crm_http(application)
     install_request_identity(application)
     install_crm_mcp(application)
     return application

@@ -16,6 +16,7 @@ from metatables import configure_local_client
 from src.erp.commerce.errors import CommerceError
 from src.erp.commerce.schemas import CheckoutCreate
 from src.erp.commerce.store import Store, require_local_runtime
+from src.erp.module_access.http import install_module_admission
 
 from .local import FORBIDDEN, loopback_host
 from .main import install_errors
@@ -36,6 +37,7 @@ def create_app():
         title="Local customer storefront", docs_url=None, redoc_url=None, openapi_url=None
     )
     install_errors(app)
+    install_module_admission(app, "commerce")
     install_request_identity(app)
     if app.state.mainsequence_request_identity["mode"] != "local":
         raise RuntimeError("The public local launcher cannot run in a platform deployment")

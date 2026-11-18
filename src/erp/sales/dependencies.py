@@ -43,6 +43,9 @@ class Dependencies:
         return service.collection(key, **query)
 
     def crm(self, path, *, params=None):
+        from src.erp.module_access import require_module
+
+        require_module("crm")
         # Optional local companion only. No invented hosted endpoint or credential forwarding.
         if not self.local or os.environ.get("SALES_CRM_ENABLED", "true") == "false":
             raise SalesError(

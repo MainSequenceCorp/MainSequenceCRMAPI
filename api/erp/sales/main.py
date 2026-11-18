@@ -17,6 +17,7 @@ from src.erp.base.store import Store as BaseStore
 from src.erp.catalog.service import CatalogError
 from src.erp.catalog.service import Service as CatalogService
 from src.erp.catalog.store import Store as CatalogStore
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 from src.erp.sales.dependencies import Dependencies
 from src.erp.sales.errors import SalesError
@@ -80,7 +81,7 @@ def discovery():
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     resolve_modules(["base", "catalog", "sales"] if enabled else [])
     app = FastAPI(title="Sales API", version="0.1.0")
     app.state.sales_store = Store(local_only=local)
@@ -209,7 +210,9 @@ def create_app(*, enabled=True, local=False):
                 )
             }
 
-    install_request_identity(app)
+    install_module_admission(app, "sales")
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

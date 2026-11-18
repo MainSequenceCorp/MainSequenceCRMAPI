@@ -1,5 +1,9 @@
 # Verification and release
 
+The current pre-push hook runs local API tests and strict documentation
+validation. Dated entries below record the former live-assistant gate.
+The assistant smoke test remains available as a manual diagnostic.
+
 Run the repeatable local checks from the repository root:
 
 ```bash
@@ -974,7 +978,7 @@ real provider/model, the project prompt and local CRM MCP bridge, verifies an
 actual governed read, then restarts Tau and the CRM API to check persisted
 local history and independent read-back. CRM calls are read-only; hosted
 storage and credentials are not replaced by mocks. See the
-[local check procedure](local-development.md#required-live-check-before-every-push).
+[local check procedure](local-development.md#optional-live-assistant-smoke-test).
 
 The first executed 2.0.11 local run failed during startup with
 `Main Sequence JWT refresh failed`. Tau was reading legacy access/refresh

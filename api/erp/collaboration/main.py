@@ -20,6 +20,8 @@ from src.erp.collaboration.schemas import (
 )
 from src.erp.collaboration.service import Service
 from src.erp.collaboration.store import Store
+from src.erp.module_access import module_available
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 
 from .identity import actor_and_capabilities, actor_name
@@ -75,7 +77,7 @@ def discovery():
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     resolve_modules(["collaboration"] if enabled else [])
     app = FastAPI(title="Collaboration API", version="0.1.0")
     app.state.collaboration_store = Store(local_only=local)
@@ -137,7 +139,7 @@ def create_app(*, enabled=True, local=False):
                 "data_source_uid": svc.store.data_source_uid,
                 "capabilities": sorted(svc.capabilities),
                 "actor_uid": str(svc.actor_uid),
-                "projects_enabled": svc.dependencies.projects_factory is not None,
+                "projects_enabled": module_available("projects") and svc.dependencies.projects_factory is not None,
             }
 
         @app.get(PREFIX + "/references/projects/")
@@ -231,7 +233,9 @@ def create_app(*, enabled=True, local=False):
         ):
             return service().history(uid, page_index=page_index, page_size=page_size)
 
-    install_request_identity(app)
+    install_module_admission(app, "collaboration")
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

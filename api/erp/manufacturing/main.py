@@ -33,6 +33,8 @@ from src.erp.manufacturing.schemas import (
 )
 from src.erp.manufacturing.service import Service
 from src.erp.manufacturing.store import Store
+from src.erp.module_access import module_available
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 
 from .identity import actor_and_capabilities
@@ -94,7 +96,7 @@ def discovery(resource):
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     resolve_modules(["base", "catalog", "inventory", "manufacturing"] if enabled else [])
     app = FastAPI(title="Manufacturing API", version="0.1.0")
     app.state.manufacturing_store = Store(local_only=local)
@@ -163,7 +165,7 @@ def create_app(*, enabled=True, local=False):
                 "data_source_uid": s.store.data_source_uid,
                 "dependencies": s.dependencies.ready(),
                 "capabilities": sorted(s.capabilities),
-                "finance_enabled": finance_enabled,
+                "finance_enabled": module_available("finance") and finance_enabled,
             }
 
         @app.get(PREFIX + "/{resource}/discovery/")
@@ -263,7 +265,9 @@ def create_app(*, enabled=True, local=False):
         def detail(resource: Resource, uid: UUID):
             return service().get(resource, uid)
 
-    install_request_identity(app)
+    install_module_admission(app, "manufacturing")
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

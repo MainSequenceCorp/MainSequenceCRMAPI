@@ -8,6 +8,7 @@ from sqlalchemy import func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.module_access import require_module
 
 from .errors import PeopleError
 from .metatables import RESOURCES, AbsenceRequest, AuditEvent, Department, Employee
@@ -36,6 +37,7 @@ class Service:
         )
 
     def require(self, cap):
+        require_module("people")
         if cap not in self.capabilities:
             raise PeopleError(403, "forbidden", "People access does not permit this operation")
 

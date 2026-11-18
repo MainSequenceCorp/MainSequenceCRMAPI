@@ -8,6 +8,7 @@ from sqlalchemy import delete, func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.module_access import admission, require_module
 
 from .errors import MarketingError
 from .metatables import RESOURCES, AuditEvent, DeliveryEvent, Mailing, Recipient, Subscriber
@@ -42,6 +43,7 @@ class Service:
         )
 
     def require(self, cap):
+        require_module("marketing")
         if cap not in self.capabilities:
             raise MarketingError(
                 403, "forbidden", "Marketing access does not permit this operation"
@@ -433,17 +435,20 @@ class Service:
         row = self.raw("mailings", uid)
         if row["state"] != "queued":
             raise MarketingError(409, "state", "Only queued mailings can run local capture")
+        # The 32-statement limit leaves space for nine recipients when the
+        # admission lock and policy check share this transaction.
+        batch_size = 9 if admission.get() is not None else 10
         pending = self.store.read(
             select(Recipient.__table__)
             .where(Recipient.mailing_uid == key(uid), Recipient.state == "pending")
             .order_by(Recipient.created_at, Recipient.uid)
-            .limit(10),
-            max_rows=10,
+            .limit(batch_size),
+            max_rows=batch_size,
         )
         total = self.count(
             Recipient, Recipient.mailing_uid == key(uid), Recipient.state == "pending"
         )
-        finished = total <= 10
+        finished = total <= batch_size
         steps = [
             self.guard(
                 Mailing,

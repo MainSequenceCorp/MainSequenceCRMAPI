@@ -10,6 +10,7 @@ from sqlalchemy import delete, func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.module_access import require_module
 
 from .errors import PurchasingError
 from .metatables import AuditEvent, Order, OrderLine, Receipt
@@ -26,6 +27,7 @@ class Service:
         )
 
     def require(self, capability):
+        require_module("purchasing")
         if capability not in self.capabilities:
             raise PurchasingError(
                 403, "forbidden", "Purchasing access does not permit this operation"

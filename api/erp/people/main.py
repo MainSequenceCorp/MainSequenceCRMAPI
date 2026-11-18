@@ -13,6 +13,8 @@ from mainsequence.server.fastapi import install_request_identity
 from src.erp.base.service import BaseError
 from src.erp.base.service import Service as BaseService
 from src.erp.base.store import Store as BaseStore
+from src.erp.module_access import module_available
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 from src.erp.people.dependencies import Dependencies
 from src.erp.people.errors import PeopleError
@@ -89,7 +91,7 @@ def discovery(resource):
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     resolve_modules(["base", "people"] if enabled else [])
     app = FastAPI(title="People API", version="0.1.0")
     app.state.people_store = Store(local_only=local)
@@ -153,7 +155,7 @@ def create_app(*, enabled=True, local=False):
                 "dependencies": svc.dependencies.ready(),
                 "capabilities": sorted(svc.capabilities),
                 "actor_uid": str(svc.actor_uid),
-                "projects_enabled": svc.dependencies.projects_factory is not None,
+                "projects_enabled": module_available("projects") and svc.dependencies.projects_factory is not None,
             }
 
         @app.get(PREFIX + "/references/{resource}/")
@@ -304,7 +306,9 @@ def create_app(*, enabled=True, local=False):
                 operating_company_uid=operating_company_uid,
             )
 
-    install_request_identity(app)
+    install_module_admission(app, "people")
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

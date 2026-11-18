@@ -6,6 +6,9 @@ import json
 from typing import Any
 
 from metatables import MetaTable
+from metatables.compiled_sql.v1 import compile_sqlalchemy_statements
+from metatables.models import MetaTableTransactionStatement
+from src.erp.module_access import admitted_guards, execute_write
 
 from ..platform.catalog import CatalogRegistry, configured_registry
 from ..platform.diagnostics import observe_stage
@@ -24,28 +27,38 @@ class GovernedGateway:
         parameter_types: dict[str, str],
         max_rows: int = 1000,
     ) -> dict[str, Any]:
-        with observe_stage("catalog", cache_hit="bindings" in getattr(self.registry, "__dict__", {})):
+        with observe_stage(
+            "catalog", cache_hit="bindings" in getattr(self.registry, "__dict__", {})
+        ):
             data_source_uid = self.registry.data_source_uid
+        statement = {
+            "sql": sql,
+            "parameters": parameters,
+            # Existing statements explicitly cast scalar inputs.
+            "parameter_types": {
+                key: value for key, value in parameter_types.items() if value in {"json", "jsonb"}
+            },
+        }
+        limits = {"max_rows": max_rows, "statement_timeout_ms": 15000}
         with observe_stage("metatables"):
+            if operation != "select":
+                guards = admitted_guards("crm", data_source_uid)
+                if guards:
+                    transaction = compile_sqlalchemy_statements(
+                        guards,
+                        operation=operation,
+                        data_source_uid=data_source_uid,
+                        limits=limits,
+                    )
+                    # Preserve the existing write's result as the final statement.
+                    transaction.statements.append(MetaTableTransactionStatement(**statement))
+                    return execute_write(transaction)
             return MetaTable.execute_operation(
                 {
                     "operation": operation,
-                    "statement": {
-                        "sql": sql,
-                        "parameters": parameters,
-                        # The current backend only normalizes temporal and JSON
-                        # metadata. All scalar values are explicitly cast by SQL
-                        # where PostgreSQL cannot infer them safely.
-                        "parameter_types": {
-                            key: value
-                            for key, value in parameter_types.items()
-                            if value in {"json", "jsonb"}
-                        },
-                    },
-                    # One DataSource per request; the database enforces table
-                    # permissions on the tables the SQL actually touches.
+                    "statement": statement,
                     "data_source_uid": data_source_uid,
-                    "limits": {"max_rows": max_rows, "statement_timeout_ms": 15000},
+                    "limits": limits,
                 }
             )
 

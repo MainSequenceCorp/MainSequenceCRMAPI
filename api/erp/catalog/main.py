@@ -14,6 +14,7 @@ from src.erp.catalog.metatables import RESOURCES, AuditEvent
 from src.erp.catalog.schemas import INPUTS, ConvertInput, VersionInput
 from src.erp.catalog.service import CatalogError, Service
 from src.erp.catalog.store import Store
+from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 
 from .identity import actor_and_capabilities
@@ -71,7 +72,7 @@ def discovery(resource):
     }
 
 
-def create_app(*, enabled=True, local=False):
+def create_app(*, enabled=True, local=False, install_identity=True):
     modules = resolve_modules(["catalog"] if enabled else [])
     app = FastAPI(title="Catalog API", version="0.1.0")
     app.state.catalog_store = Store(local_only=local)
@@ -240,7 +241,9 @@ def create_app(*, enabled=True, local=False):
 
         for resource in RESOURCES:
             mount(resource)
-    install_request_identity(app)
+    install_module_admission(app, "catalog")
+    if install_identity:
+        install_request_identity(app)
     return app
 
 

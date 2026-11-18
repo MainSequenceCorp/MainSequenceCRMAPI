@@ -4,6 +4,7 @@ from metatables import MetaTable, MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import compile_sqlalchemy_statement, compile_sqlalchemy_statements
 from src.erp.base.store import Store as BaseStore
 from src.erp.crm.repositories.errors import ResourceConflict
+from src.erp.module_access import execute_write, guard_write
 
 
 class Store:
@@ -104,12 +105,13 @@ class Store:
         )["rows"]
 
     def write(self, statements):
+        source = self.data_source_uid
         try:
-            return MetaTable.execute_transaction(
+            return execute_write(
                 compile_sqlalchemy_statements(
-                    statements,
+                    guard_write("crm", source, statements),
                     operation="update",
-                    data_source_uid=self.data_source_uid,
+                    data_source_uid=source,
                     limits={"max_rows": 100, "statement_timeout_ms": 15000},
                 )
             )["rows"]

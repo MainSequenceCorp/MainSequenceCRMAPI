@@ -11,6 +11,7 @@ from sqlalchemy import delete, func, insert, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.module_access import require_module
 
 from .errors import ManufacturingError
 from .metatables import RESOURCES, AuditEvent, Bom, BomLine, Production, WorkStep
@@ -45,6 +46,7 @@ class Service:
         )
 
     def require(self, cap):
+        require_module("manufacturing")
         if cap not in self.capabilities:
             raise ManufacturingError(
                 403, "forbidden", "Manufacturing access does not permit this operation"

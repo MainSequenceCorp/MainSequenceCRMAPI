@@ -10,6 +10,7 @@ from sqlalchemy import delete, func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.module_access import require_module
 
 from .errors import FinanceError
 from .metatables import RESOURCES, Allocation, AuditEvent, Invoice, InvoiceLine, Payment, Posting
@@ -40,6 +41,7 @@ class Service:
         )
 
     def require(self, capability):
+        require_module("finance")
         if capability not in self.capabilities:
             raise FinanceError(403, "forbidden", "Finance access does not permit this operation")
 

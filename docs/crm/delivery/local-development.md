@@ -263,18 +263,22 @@ and the final pending text is appended before finalization. The previous
 The streaming fix alone does not establish a successful CRM read. Hosted
 acceptance still requires the completed artifact and fresh API comparison above.
 
-### Required live check before every push
+### Local pre-push checks
 
-Run the actual local-mode agent before publishing:
+Install the repository hook with:
 
 ```bash
-.venv/bin/python scripts/erp/crm/agent/verify_local_agent.py
 git config --local core.hooksPath .githooks
 ```
 
-The repository's executable `.githooks/pre-push` runs this check on every push
-and rejects a failed check. It tests the checked-out revision being pushed;
-commit pending changes first. Do not bypass it with `--no-verify`.
+The hook verifies the checked-out revision, runs focused local ERP and CRM
+contract tests, and builds the API documentation in strict mode.
+
+### Optional live assistant smoke test
+
+```bash
+.venv/bin/python scripts/erp/crm/agent/verify_local_agent.py
+```
 
 The check starts the real `api.agents.crm.main:app` and `api.erp.crm.local:app` on unused
 loopback ports. It selects the workflow's provider, model and thinking level
@@ -297,7 +301,7 @@ scoped empty Contact search used for a separate hosted-data smoke check.
 Tau's state and private process logs stay under ignored
 `.local/agent-pre-push/<run>/`; each `report.json` records the version, model,
 result and evidence boundary. Tau runs locally, but its provider and user
-authentication are real remote services. The default gate launches the installed
+authentication are real remote services. The optional check launches the installed
 MetaTables local API with the real SDK identity, a separate storage directory,
 configuration and file credential store owned by that run. It verifies Local
 mode, SQLite and the exact private path before initializing system migrations
@@ -306,7 +310,6 @@ before starting CRM/Tau. Neither the developer's ordinary local database nor the
 hosted database is selected or migrated. The MCP/business smoke calls remain
 read-only. PostgreSQL-specific Contact queries are verified separately against
 the deployed runtime; the SQLite gate does not claim their portability.
-An unavailable provider, sign-in or private database blocks the push.
 If legacy credentials in `.env` override the saved CLI login, repair
 the sign-in with `.venv/bin/mainsequence refresh-token`; never print or copy
 the token values. The developer also needs Reader access to the CRM namespace
@@ -474,7 +477,6 @@ The workflow's real provider/model and the normal saved CLI login remain require
 Local mode describes the agent/conversation store; the CRM dataset remains the
 configured environment. Remove only disposable records explicitly owned by the
 test, after verifying their current state. Never replay an uncertain setup write.
-The pre-push hook runs its isolated, read-only settings gate on the committed revision.
 
 
 ## CRM using shared Base identities

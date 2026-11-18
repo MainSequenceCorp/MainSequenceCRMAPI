@@ -8,6 +8,7 @@ from sqlalchemy import func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.module_access import require_module
 
 from .errors import ProjectsError
 from .metatables import RESOURCES, AuditEvent, DeliveryTask, Project, TimeEntry
@@ -45,6 +46,7 @@ class Service:
         )
 
     def require(self, cap):
+        require_module("projects")
         if cap not in self.capabilities:
             raise ProjectsError(403, "forbidden", "Projects access does not permit this operation")
 

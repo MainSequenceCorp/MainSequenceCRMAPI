@@ -10,6 +10,7 @@ from sqlalchemy import func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.module_access import require_module
 
 from .errors import InventoryError
 from .metatables import RESOURCES, AuditEvent, Balance, Entry, Location, Move, StockItem
@@ -53,6 +54,7 @@ class Service:
         )
 
     def require(self, cap):
+        require_module("inventory")
         if cap not in self.capabilities:
             raise InventoryError(
                 403, "forbidden", "Inventory access does not permit this operation"

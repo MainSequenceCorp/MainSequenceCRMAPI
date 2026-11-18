@@ -1,3 +1,5 @@
+# Superseded by the shared ERP API in .mainsequence/workflows/crm-api.yaml.
+# Historical example retained outside the workflow directory.
 # Inert candidate: outside .mainsequence/workflows. Not platform-validated or approved.
 # Validate target branch and access, then obtain user approval before activation.
 api_version: "3.0.0"

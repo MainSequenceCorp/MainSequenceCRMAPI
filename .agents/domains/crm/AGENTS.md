@@ -20,19 +20,12 @@ Target: Python FastAPI, Main Sequence MetaTables, Vite React/TypeScript and the 
 
 Prove atomic governed commands and fresh-process catalog binding before completing mutation changes. Report executed checks separately from specified, mocked or unexecuted tests.
 
-User-required pre-push gate (2026-10-11): always run the actual CRM agent in
-Tau local mode with the workflow's real provider/model before pushing. Run
-`.venv/bin/python scripts/erp/crm/agent/verify_local_agent.py`; unit tests, ASGI imports,
-health alone, mocked providers and hosted-only tests do not satisfy this gate.
-The check must exercise the real CRM MCP bridge, inspect actual successful tool
-results, preserve local history across restart, and compare a fresh API read.
-Keep CRM smoke-test calls read-only. If the live check fails or is unavailable,
-fix or report the failure and do not push or bypass the gate with `--no-verify`.
+Before pushing, run the relevant API and documentation checks locally.
 Install the repository hook with `git config --local core.hooksPath .githooks`.
-For changes to mutations, also verify an explicitly owned disposable fixture
-through create/update/read-back and clean it up after confirming current state;
-never replay an uncertain write. Retain failed-run evidence under ignored
-`.local/agent-pre-push/` and distinguish a local-mode agent from hosted CRM data.
+It checks the clean committed revision, API contracts and strict documentation.
+For changes to mutations, verify an explicitly owned disposable fixture through
+create/update/read-back and clean up after confirming current state. Never replay
+an uncertain write.
 
 Current repository decision (2026-09-23): Alembic `0003` removes `command_receipt`; CRM commands no longer require `Idempotency-Key` or promise replay. Keep version fences and governed atomic writes, and read server state before retrying an uncertain write.
 

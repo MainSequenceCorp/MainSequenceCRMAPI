@@ -13,6 +13,7 @@ from sqlalchemy import func, insert, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.module_access import module_available, require_module
 
 from .errors import CommerceError
 from .metatables import RESOURCES, AuditEvent, Checkout, Offer, PortalGrant, Site
@@ -42,6 +43,7 @@ class Service:
         )
 
     def require(self, cap):
+        require_module("commerce")
         if cap not in self.capabilities:
             raise CommerceError(403, "forbidden", "Commerce access does not permit this operation")
 
@@ -365,7 +367,7 @@ class Service:
             "slug": site["slug"],
             "body": site["body"],
             "currency_code": site["snapshot"]["currency_code"],
-            "checkout_enabled": self.dependencies.sales_factory is not None,
+            "checkout_enabled": module_available("sales") and self.dependencies.sales_factory is not None,
             "offers": [
                 {
                     "uid": r["uid"],

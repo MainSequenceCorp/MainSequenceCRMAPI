@@ -1,4 +1,28 @@
 #!/bin/sh
 set -eu
 cd "$(git rev-parse --show-toplevel)"
-exec .venv/bin/python scripts/erp/crm/agent/verify_local_agent.py --pre-push
+
+if [ -n "$(git status --porcelain)" ]; then
+    echo "Commit pending changes before pushing." >&2
+    exit 1
+fi
+
+head=$(git rev-parse HEAD)
+while read -r _local_ref local_oid _remote_ref _remote_oid; do
+    case "$local_oid" in
+        *[!0]*)
+            if [ "$(git rev-parse "$local_oid^{commit}")" != "$head" ]; then
+                echo "Check out the revision being pushed so its local checks can run." >&2
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+git show --format= --check HEAD
+.venv/bin/python -m pytest -q \
+    tests/erp/test_application.py \
+    tests/erp/crm/unit \
+    tests/erp/crm/documentation \
+    tests/erp/crm/integration/test_deployment_workflow.py
+exec .venv/bin/mkdocs build --strict

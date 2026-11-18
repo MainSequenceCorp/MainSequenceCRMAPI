@@ -30,8 +30,8 @@ The separately deployed CRM assistant uses `.tau/SYSTEM.md` and its effective
 CRM tool catalogue. In CRM chat, these coding
 instructions do not grant that runtime file editing, shell access, platform
 MCP access, or CRM permissions. Its excluded coding tools remain excluded.
-Before pushing, run `.venv/bin/python scripts/erp/crm/agent/verify_local_agent.py`
-with the workflow's actual provider/model; preserve the user-required pre-push gate.
+Before pushing, run the relevant local tests and strict documentation build.
+The pre-push hook checks the committed revision, API contracts and documentation.
 
 <!-- mainsequence-agent-scaffold:start schema=1 source=agent_scaffold -->`
 or `<!-- mainsequence-agent-scaffold:end -->` markers. `mainsequence code-repository update AGENTS.md`

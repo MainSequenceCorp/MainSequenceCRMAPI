@@ -3,12 +3,21 @@
 from functools import lru_cache
 
 
-@lru_cache(maxsize=8)
 def identity_consumers(store):
     from src.erp.crm.base_adoption.runtime import enabled
 
     if not enabled():
         return {}
+
+    def project(*args):
+        return _crm_projector(store)(*args)
+
+    return {"crm": project}
+
+
+@lru_cache(maxsize=8)
+def _crm_projector(store):
+    """Validate CRM adoption when Base writes an identity with a CRM claim."""
     from src.erp.crm.base_adoption.projector import consumer
     from src.erp.crm.base_adoption.store import Store
     from src.erp.crm.platform.catalog import configured_registry
@@ -17,4 +26,4 @@ def identity_consumers(store):
         store.data_source_uid
     ):
         raise RuntimeError("CRM and Base require the same governed DataSource")
-    return {"crm": consumer(store)}
+    return consumer(store)

@@ -8,6 +8,7 @@ from sqlalchemy import func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.module_access import require_module
 
 from .errors import CollaborationError
 from .metatables import AuditEvent, Discussion, Message, MessageRevision
@@ -33,6 +34,7 @@ class Service:
         )
 
     def require(self, cap):
+        require_module("collaboration")
         if cap not in self.capabilities:
             raise CollaborationError(
                 403, "forbidden", "Collaboration access does not permit this operation"

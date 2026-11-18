@@ -2,13 +2,15 @@
 
 import logging
 from importlib import import_module
+from time import perf_counter
 from uuid import UUID
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from mainsequence.client import User
 from mainsequence.server.fastapi import install_request_identity, reads_as_caller
+from src.erp.catalog_bindings import load_active_catalog
 from src.erp.user_preferences.errors import UserPreferencesError
 from src.erp.user_preferences.identity import is_local_person
 from src.erp.user_preferences.schemas import (
@@ -90,20 +92,30 @@ def _reader(actor, *, local):
 
 def ready_modules(store, *, local):
     """Check approved module schema/provider bindings against the policy source."""
+    keys = provisioned_module_keys()
+    expected = {}
+    for key in sorted(keys):
+        models = import_module(f"src.erp.{key}.metatables").MODELS
+        expected[key] = models.values() if isinstance(models, dict) else models
+
+    catalog = load_active_catalog(
+        model.__metatable_identifier__ for models in expected.values() for model in models
+    )
+    policy_source = str(store.data_source_uid)
     ready = set()
-    for key in provisioned_module_keys():
+    for key in expected:
         try:
             if key == "crm":
                 from src.erp.crm.platform.catalog import CatalogRegistry
 
-                registry = CatalogRegistry()
+                registry = CatalogRegistry(catalog=catalog)
                 registry.validate()
                 registry.validate_settings()
                 source = registry.data_source_uid
             else:
                 module = import_module(f"src.erp.{key}.store")
-                source = module.Store(local_only=local).data_source_uid
-            if str(source) == str(store.data_source_uid):
+                source = module.Store(local_only=local, catalog=catalog).data_source_uid
+            if str(source) == policy_source:
                 ready.add(key)
         except Exception as error:
             logger.info("ERP module %s is unready (%s)", key, type(error).__name__)
@@ -147,11 +159,20 @@ def create_app(*, local=False, install_identity=True):
         return {"status": "running", "service": "user_preferences"}
 
     @app.get(PREFIX + "/bootstrap/")
-    def bootstrap(request: Request):
+    def bootstrap(request: Request, response: Response):
+        started = perf_counter()
         current = service(request)
-        return current.bootstrap(
-            ready_modules(current.store, local=local), _reader(current.actor, local=local)
+        identified = perf_counter()
+        ready = ready_modules(current.store, local=local)
+        catalog_checked = perf_counter()
+        result = current.bootstrap(ready, _reader(current.actor, local=local))
+        done = perf_counter()
+        response.headers["Server-Timing"] = (
+            f"identity;dur={(identified - started) * 1000:.1f}, "
+            f"catalog;dur={(catalog_checked - identified) * 1000:.1f}, "
+            f"settings;dur={(done - catalog_checked) * 1000:.1f}"
         )
+        return result
 
     @app.get(PREFIX + "/user-preferences/")
     def preferences(request: Request):

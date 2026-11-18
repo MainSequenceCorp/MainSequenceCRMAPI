@@ -26,6 +26,10 @@ def read_policy(store, scope, *, allow_uninitialized=False):
     model = EnvironmentModuleActivation.__table__
     columns = (model.c.version, model.c.active_module_keys)
     row = store.one(select(*columns).where(model.c.environment_uid == UUID(str(scope))))
+    return validate_policy(row, allow_uninitialized=allow_uninitialized)
+
+
+def validate_policy(row, *, allow_uninitialized=False):
     if row is None:
         if allow_uninitialized:
             return None

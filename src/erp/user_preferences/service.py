@@ -4,14 +4,14 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import and_, insert, select, update
 
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
 from src.erp.modules import MODULES, REQUIRED_MODULES, WORKFLOWS, active_modules, module_closure
 
-from .admission import lock_admission, read_policy
+from .admission import lock_admission, read_policy, validate_policy
 from .errors import UserPreferencesError
 from .metatables import (
     EnvironmentModuleActivation,
@@ -117,10 +117,34 @@ class Service:
         }
 
     def bootstrap(self, provisioned, can_read):
+        activation = EnvironmentModuleActivation.__table__
+        preference = UserPreference.__table__
+        row = self.store.one(
+            select(
+                activation.c.version,
+                activation.c.active_module_keys,
+                preference.c.hidden_module_keys,
+                preference.c.version.label("preference_version"),
+            )
+            .select_from(
+                activation.outerjoin(
+                    preference,
+                    and_(
+                        preference.c.environment_uid == activation.c.environment_uid,
+                        preference.c.person_uid == self.actor,
+                    ),
+                )
+            )
+            .where(activation.c.environment_uid == self.scope)
+        )
+        policy = validate_policy(row)
         return {
-            **self.overview(self.policy(), provisioned, can_read),
+            **self.overview(policy, provisioned, can_read),
             "organization_environment_uid": self.scope,
-            "preferences": self.preferences(),
+            "preferences": {
+                "hidden_module_keys": row["hidden_module_keys"] or [],
+                "version": row["preference_version"] or 0,
+            },
             "can_manage": self.can_manage,
         }
 

@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import delete, select, update
 
+from api.erp.user_preferences.main import ready_modules
 from metatables import MetaTable, MetaTableTransactionGuardError, configure_local_client
 from src.erp.modules import MODULES
 from src.erp.user_preferences.admission import POLICY_LABEL, guard_active, require_active
@@ -140,6 +141,30 @@ def local_policy(local_scope):
     return local_scope
 
 
+def test_readiness_batches_module_lookups_and_revalidates_bindings(local_scope, monkeypatch):
+    _, store, _ = local_scope
+    assert store.data_source_uid == store.source_uid
+    original_filter = MetaTable.filter
+    batches = []
+    reject_sales_binding = False
+
+    def catalog_filter(*, identifier__in, provisioning_status):
+        batches.append(tuple(identifier__in))
+        rows = original_filter(identifier__in=identifier__in, provisioning_status=provisioning_status)
+        if reject_sales_binding:
+            return [row for row in rows if row.identifier != "erp_sales.order"]
+        return rows
+
+    monkeypatch.setattr(MetaTable, "filter", catalog_filter)
+    assert ready_modules(store, local=True) == MODULES.keys()
+    assert len(batches) == 2
+    assert not set(batches[0]) & set(batches[1])
+
+    reject_sales_binding = True
+    assert ready_modules(store, local=True) == MODULES.keys() - {"sales"}
+    assert len(batches) == 4
+
+
 def test_first_policy_save_is_admin_only_audited_and_idempotent(local_scope):
     manager, store, scope = local_scope
     provisioned = MODULES.keys()
@@ -185,6 +210,13 @@ def test_local_personal_preference_and_manager_permissions(local_policy):
     change = PreferenceInput(hidden_module_keys=["sales"], expected_version=0)
     assert reader.save_preferences(change) == {"version": 1, "hidden_module_keys": ["sales"]}
     assert manager.preferences() == {"version": 0, "hidden_module_keys": []}
+    reader_bootstrap = reader.bootstrap(MODULES.keys(), lambda key: key != "sales")
+    manager_bootstrap = manager.bootstrap(MODULES.keys(), lambda key: key != "sales")
+    assert reader_bootstrap["active_module_keys"] == ["catalog", "sales"]
+    assert reader_bootstrap["policy_version"] == 1
+    assert reader_bootstrap["preferences"] == {"version": 1, "hidden_module_keys": ["sales"]}
+    assert manager_bootstrap["preferences"] == {"version": 0, "hidden_module_keys": []}
+    assert not next(row for row in reader_bootstrap["modules"] if row["key"] == "sales")["can_access"]
     with pytest.raises(UserPreferencesError, match="Settings changed"):
         reader.save_preferences(change)
     with pytest.raises(UserPreferencesError, match="Only an ERP administrator"):

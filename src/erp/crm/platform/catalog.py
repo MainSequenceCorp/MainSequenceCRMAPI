@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from metatables import MetaTable
 from metatables.compiled_sql.v1 import compile_sqlalchemy_statement
+from src.erp.catalog_bindings import active_catalog_rows
 
 from ..metatables import MODELS
 
@@ -30,12 +31,15 @@ class CatalogValidationError(RuntimeError):
 class CatalogRegistry:
     """Bind only the active, provider-owned tables authored by this CRM."""
 
+    def __init__(self, *, catalog=None):
+        self.catalog = catalog
+
     @cached_property
     def bindings(self) -> dict[str, CatalogBinding]:
         expected = {
             model.__metatable_identifier__: model.__tablename__ for model in MODELS.values()
         }
-        rows = MetaTable.filter(identifier__in=list(expected), provisioning_status="active")
+        rows = active_catalog_rows(expected, catalog=self.catalog)
         bindings: dict[str, CatalogBinding] = {}
         providers: set[str] = set()
         revisions: set[str] = set()

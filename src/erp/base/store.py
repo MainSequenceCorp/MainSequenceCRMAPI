@@ -5,6 +5,7 @@ from functools import cached_property
 from metatables import MetaTable, get_runtime_status
 from metatables.compiled_sql.v1 import compile_sqlalchemy_statement, compile_sqlalchemy_statements
 from src.erp.base.metatables import MODELS
+from src.erp.catalog_bindings import active_catalog_rows
 
 
 def require_local_runtime():
@@ -25,14 +26,15 @@ def require_local_runtime():
 
 
 class Store:
-    def __init__(self, *, local_only=False):
+    def __init__(self, *, local_only=False, catalog=None):
         self.local_only = local_only
+        self.catalog = catalog
 
     @cached_property
     def data_source_uid(self):
         expected_source = require_local_runtime() if self.local_only else None
         expected = {model.__metatable_identifier__: model.__tablename__ for model in MODELS}
-        rows = MetaTable.filter(identifier__in=list(expected), provisioning_status="active")
+        rows = active_catalog_rows(expected, catalog=self.catalog)
         if len(rows) != len(expected) or {row.identifier for row in rows} != set(expected):
             raise RuntimeError("Base migration bindings are incomplete")
         sources, providers, revisions = set(), set(), set()

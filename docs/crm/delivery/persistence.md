@@ -243,8 +243,7 @@ to match the validated catalog's DataSource, with a two-row limit and a
 five-second statement timeout. This check works with local SQLite and hosted
 PostgreSQL; it does not make the CRM's PostgreSQL business commands portable.
 
-Hosted environments are migrated only by the deployment workflow.
-`.mainsequence/workflows/crm-api.yaml` is the repository's only workflow file.
+Hosted CRM migrations run through `.mainsequence/workflows/crm-api.yaml`.
 It declares the CRM API (`crm`), the CRM assistant (`crm-assistant`) and
 the `migrate-crm` Job, which runs `jobs/erp/crm/migrate.py` from the candidate
 image. The Job calls
@@ -267,6 +266,12 @@ execution:
     image_assistant: {prepare_image: crm-assistant}
     deploy_assistant: {deploy: crm-assistant, image_from: image_assistant, needs: [deploy_api, image_assistant]}
 ```
+
+The local workflow declaration uses the same `v<major>.<minor>.<patch>-crm`
+tag filter for all three resources. Main Sequence's read-only validation
+accepted the declaration. Applying the policy, publishing a tag, and verifying
+the resulting migration and deployment require the separately approved
+platform rollout. Expansion modules have their own migration Job declarations.
 
 At the current head, the Job still checks physical tables and reconciles
 catalog bindings; `migrated=False` only means the revision did not change.

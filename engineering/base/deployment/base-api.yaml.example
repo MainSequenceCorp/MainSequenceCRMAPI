@@ -1,0 +1,51 @@
+# Inert candidate: outside .mainsequence/workflows. Not platform-validated or approved.
+# Validate target branch and access, then obtain user approval before activation.
+api_version: "3.0.0"
+name: base-api
+resources:
+  - key: base
+    kind: fastapi
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      source_path: api/erp/base/main.py
+      mcp_enabled: false
+      cpu_request: "0.5"
+      memory_request: 1Gi
+      spot: false
+      automatic_deployment: true
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-base$'
+      revision_retention_count: 3
+  - key: migrate-base
+    kind: job
+    access:
+      branches:
+        - repository: MetaTables
+          policy: reader
+    spec:
+      name: Base migrations
+      description: Apply only Base migrations before Base API activation.
+      execution_path: jobs/erp/base/migrate.py
+      cpu_request: "0.5"
+      memory_request: "1"
+      max_runtime_seconds: 1800
+      spot: false
+      automatic_redeployment:
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-base$'
+execution:
+  steps:
+    image:
+      prepare_image: base
+    migrate:
+      run_job: migrate-base
+      image_from: image
+      needs: [image]
+    deploy_api:
+      deploy: base
+      image_from: image
+      needs: [migrate]

@@ -13,6 +13,7 @@ are in [verification](verification.md). The user has now authorized CRM extracti
 | Typed inputs, commands, seeding and governed persistence | `src/erp/base/` |
 | HTTP routes and existing platform identity integration | `api/erp/base/` |
 | Explicit local setup and future migration Job entrypoint | `scripts/erp/base/`, `jobs/erp/base/` |
+| Inactive API workflow with its own release tag | [Base workflow candidate](deployment/base-api.yaml.example) |
 | Local integration tests and pinned SDK contract fixtures | `tests/erp/base/` |
 | Technical module registration only | `src/erp/modules.py` |
 

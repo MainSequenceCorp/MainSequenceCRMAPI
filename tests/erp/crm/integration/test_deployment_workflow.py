@@ -12,7 +12,7 @@ import metatables
 
 ROOT = Path(__file__).resolve().parents[4]
 WORKFLOWS = ROOT / ".mainsequence" / "workflows"
-EVERY_PUSH = {"enabled": True, "tag_regex": None}
+CRM_RELEASE_TAG = {"enabled": True, "tag_regex": r"^v[0-9]+[.][0-9]+[.][0-9]+-crm$"}
 
 
 def _workflow() -> dict:
@@ -73,7 +73,7 @@ def test_api_and_assistant_deploy_only_after_the_migration_job():
     assert (ROOT / job["execution_path"]).is_file()
     # Every connected step must be admitted by the same promotion policy.
     for item in resources.values():
-        assert item["spec"]["automatic_redeployment"] == EVERY_PUSH
+        assert item["spec"]["automatic_redeployment"] == CRM_RELEASE_TAG
     assert resources["migrate-crm"]["access"] == {
         "branches": [{"repository": "MetaTables", "policy": "reader"}]
     }
@@ -152,7 +152,7 @@ def test_the_assistant_kept_its_declaration_when_it_moved_into_this_file():
             "tools": [{"application": "crm", "pose": "outreach"}],
         },
         "automatic_deployment": True,
-        "automatic_redeployment": EVERY_PUSH,
+        "automatic_redeployment": CRM_RELEASE_TAG,
         "revision_retention_count": 3,
         "env_vars": [
             {"name": "TAU_EXCLUDE_BASE_TOOLS", "value": "true"},

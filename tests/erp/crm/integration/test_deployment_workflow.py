@@ -53,7 +53,7 @@ def test_migration_job_upgrades_provisioned_modules_and_preferences(monkeypatch,
         return {"migrated": migrated, "revision": "0009", "data_source_uid": SOURCE}
 
     monkeypatch.setattr(metatables, "upgrade_application", upgrade_application)
-    runpy.run_path(str(ROOT / "jobs" / "erp" / "crm" / "migrate.py"), run_name="__main__")
+    runpy.run_path(str(ROOT / "jobs" / "migrate_crm.py"), run_name="__main__")
     assert calls == list(BASE_CRM_PROVIDERS)
     assert capsys.readouterr().out.splitlines() == [
         f"{provider}: 0009 ({state}; catalog reconciled) on {SOURCE}"
@@ -125,7 +125,7 @@ def test_first_main_push_only_provisions_erp_storage():
     }
 
     job = resources["migrate-crm"]["spec"]
-    assert job["execution_path"] == "jobs/erp/crm/migrate.py"
+    assert job["execution_path"] == "jobs/migrate_crm.py"
     assert job["automatic_redeployment"] == ERP_RELEASE_POLICY
     config = {item["name"]: item["value"] for item in job["env_vars"]}
     UUID(config["ERP_USER_PREFERENCES_DATA_SOURCE_UID"])

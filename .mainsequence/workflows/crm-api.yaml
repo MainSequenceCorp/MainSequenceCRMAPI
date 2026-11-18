@@ -21,10 +21,10 @@ resources:
       cpu_request: "0.5"
       memory_request: 1Gi
       spot: false
-      automatic_deployment: false
+      automatic_deployment: true
       automatic_redeployment:
-        enabled: false
-        tag_regex: null
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-erp-api$'
       revision_retention_count: 3
 
   - key: migrate-crm
@@ -77,10 +77,10 @@ resources:
       llm_provider: openai-codex
       llm_model: gpt-5.6-luna
       llm_thinking: medium
-      automatic_deployment: false
+      automatic_deployment: true
       automatic_redeployment:
-        enabled: false
-        tag_regex: null
+        enabled: true
+        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-erp-api$'
       revision_retention_count: 3
       env_vars:
         - name: TAU_EXCLUDE_BASE_TOOLS
@@ -88,7 +88,8 @@ resources:
         - name: TAU_EXCLUDE_MAINSEQUENCE_MCP
           value: "true"
 
-# The first main push provisions ERP storage before either existing runtime moves.
+# This branch push provisions storage. API and assistant promotion requires
+# a matching release tag, while this Job is admitted by a push to main.
 execution:
   steps:
     image:

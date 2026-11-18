@@ -16,6 +16,7 @@ from src.erp.modules import MODULES, resolve_modules
 ROOT = Path(__file__).resolve().parents[4]
 WORKFLOWS = ROOT / ".mainsequence" / "workflows"
 ERP_RELEASE_POLICY = {"enabled": True, "tag_regex": None}
+RUNTIME_TAG_POLICY = {"enabled": True, "tag_regex": r"^v[0-9]+[.][0-9]+[.][0-9]+-erp-api$"}
 SOURCE = str(UUID(int=18249))
 BASE_CRM_PROVIDERS = (
     "src.erp.base.migrations:migration",
@@ -112,8 +113,8 @@ def test_first_main_push_only_provisions_erp_storage():
     assert set(resources) == {"crm", "migrate-crm", "crm-assistant"}
     for key in ("crm", "crm-assistant"):
         spec = resources[key]["spec"]
-        assert spec["automatic_deployment"] is False
-        assert spec["automatic_redeployment"] == {"enabled": False, "tag_regex": None}
+        assert spec["automatic_deployment"] is True
+        assert spec["automatic_redeployment"] == RUNTIME_TAG_POLICY
 
     crm = resources["crm"]["spec"]
     assert crm["source_path"] == "api/erp/crm/main.py"
@@ -159,8 +160,8 @@ def test_the_assistant_kept_its_declaration_when_it_moved_into_this_file():
             },
             "tools": [{"application": "crm", "pose": "outreach"}],
         },
-        "automatic_deployment": False,
-        "automatic_redeployment": {"enabled": False, "tag_regex": None},
+        "automatic_deployment": True,
+        "automatic_redeployment": RUNTIME_TAG_POLICY,
         "revision_retention_count": 3,
         "env_vars": [
             {"name": "TAU_EXCLUDE_BASE_TOOLS", "value": "true"},

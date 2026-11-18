@@ -11,7 +11,7 @@ resources:
         - repository: MetaTables
           policy: reader
     spec:
-      source_path: api/erp/main.py
+      source_path: api/crm/main.py
       mcp_enabled: true
       public_ingress:
         - method: GET

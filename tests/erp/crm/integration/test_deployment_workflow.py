@@ -113,7 +113,7 @@ def test_main_push_promotes_the_shared_api_after_the_migration():
     assert set(resources) == {"crm", "migrate-crm", "crm-assistant"}
 
     crm = resources["crm"]["spec"]
-    assert crm["source_path"] == "api/erp/main.py"
+    assert crm["source_path"] == "api/crm/main.py"
     assert (ROOT / crm["source_path"]).is_file()
     assert crm["mcp_enabled"] is True
     assert crm["automatic_deployment"] is True
@@ -138,6 +138,22 @@ def test_main_push_promotes_the_shared_api_after_the_migration():
             "deploy_api": {"deploy": "crm", "image_from": "image", "needs": ["migrate"]},
         }
     }
+
+
+def test_registered_api_requires_erp_settings_in_hosted_mode(monkeypatch):
+    from api.erp.main import app
+    from src.erp.user_preferences.errors import UserPreferencesError
+
+    entrypoint = ROOT / "api" / "crm" / "main.py"
+    monkeypatch.setitem(app.state.mainsequence_request_identity, "mode", "assertion")
+    monkeypatch.setenv("MAINSEQUENCE_ORGANIZATION_ENVIRONMENT_UID", str(UUID(int=42)))
+    monkeypatch.delenv("ERP_USER_PREFERENCES_DATA_SOURCE_UID", raising=False)
+    with pytest.raises(UserPreferencesError):
+        runpy.run_path(str(entrypoint))
+
+    monkeypatch.setenv("ERP_USER_PREFERENCES_DATA_SOURCE_UID", SOURCE)
+    monkeypatch.setenv("ERP_USER_PREFERENCES_PROVISIONED_MODULES", "base,crm")
+    assert runpy.run_path(str(entrypoint))["app"] is app
 
 
 def test_the_assistant_kept_its_declaration_when_it_moved_into_this_file():

@@ -11,7 +11,7 @@ resources:
         - repository: MetaTables
           policy: reader
     spec:
-      source_path: api/erp/crm/main.py
+      source_path: api/erp/main.py
       mcp_enabled: true
       public_ingress:
         - method: GET
@@ -24,8 +24,13 @@ resources:
       automatic_deployment: true
       automatic_redeployment:
         enabled: true
-        tag_regex: '^v[0-9]+[.][0-9]+[.][0-9]+-erp-api$'
+        tag_regex: null
       revision_retention_count: 3
+      env_vars:
+        - name: ERP_USER_PREFERENCES_DATA_SOURCE_UID
+          value: "ebd9bc7f-5f11-42fa-8961-19e9e66e2196"
+        - name: ERP_USER_PREFERENCES_PROVISIONED_MODULES
+          value: "base,catalog,crm,sales,finance,projects,people,collaboration,marketing,inventory,purchasing,manufacturing,commerce,reporting"
 
   - key: migrate-crm
     kind: job
@@ -88,13 +93,17 @@ resources:
         - name: TAU_EXCLUDE_MAINSEQUENCE_MCP
           value: "true"
 
-# This branch push provisions storage. API and assistant promotion requires
-# a matching release tag, while this Job is admitted by a push to main.
+# The existing CRM resource serves all ERP modules after its schemas reconcile.
+# Keep the CRM assistant stable while the shared API is promoted.
 execution:
   steps:
     image:
-      prepare_image: migrate-crm
+      prepare_image: crm
     migrate:
       run_job: migrate-crm
       image_from: image
       needs: [image]
+    deploy_api:
+      deploy: crm
+      image_from: image
+      needs: [migrate]

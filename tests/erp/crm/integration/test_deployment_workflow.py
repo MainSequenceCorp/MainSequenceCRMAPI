@@ -106,19 +106,18 @@ def test_the_repository_has_one_workflow_file():
     assert sorted(path.name for path in WORKFLOWS.iterdir()) == ["crm-api.yaml"]
 
 
-def test_first_main_push_only_provisions_erp_storage():
+def test_main_push_promotes_the_shared_api_after_the_migration():
     workflow = _workflow()
     assert (workflow["api_version"], workflow["name"]) == ("3.0.0", "crm-api")
     resources = {item["key"]: item for item in workflow["resources"]}
     assert set(resources) == {"crm", "migrate-crm", "crm-assistant"}
-    for key in ("crm", "crm-assistant"):
-        spec = resources[key]["spec"]
-        assert spec["automatic_deployment"] is True
-        assert spec["automatic_redeployment"] == RUNTIME_TAG_POLICY
 
     crm = resources["crm"]["spec"]
-    assert crm["source_path"] == "api/erp/crm/main.py"
+    assert crm["source_path"] == "api/erp/main.py"
+    assert (ROOT / crm["source_path"]).is_file()
     assert crm["mcp_enabled"] is True
+    assert crm["automatic_deployment"] is True
+    assert crm["automatic_redeployment"] == ERP_RELEASE_POLICY
     assert {route["path"] for route in crm["public_ingress"]} == {
         "/extensions/google/oauth/callback/",
         "/extensions/google/oauth/done/",
@@ -127,13 +126,16 @@ def test_first_main_push_only_provisions_erp_storage():
     job = resources["migrate-crm"]["spec"]
     assert job["execution_path"] == "jobs/migrate_crm.py"
     assert job["automatic_redeployment"] == ERP_RELEASE_POLICY
+    assert job["env_vars"] == crm["env_vars"]
     config = {item["name"]: item["value"] for item in job["env_vars"]}
     UUID(config["ERP_USER_PREFERENCES_DATA_SOURCE_UID"])
     assert set(config["ERP_USER_PREFERENCES_PROVISIONED_MODULES"].split(",")) == set(MODULES)
+
     assert workflow["execution"] == {
         "steps": {
-            "image": {"prepare_image": "migrate-crm"},
+            "image": {"prepare_image": "crm"},
             "migrate": {"run_job": "migrate-crm", "image_from": "image", "needs": ["image"]},
+            "deploy_api": {"deploy": "crm", "image_from": "image", "needs": ["migrate"]},
         }
     }
 

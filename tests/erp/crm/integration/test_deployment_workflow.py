@@ -159,7 +159,7 @@ def test_registered_api_requires_erp_settings_in_hosted_mode(monkeypatch):
 def test_the_assistant_kept_its_declaration_when_it_moved_into_this_file():
     resources = {item["key"]: item for item in _workflow()["resources"]}
     assert resources["crm-assistant"]["spec"] == {
-        "source_path": "api/agents/crm/main.py",
+        "source_path": "api/tau/main.py",
         "mcp_applications": [{"resource": "crm"}],
         "llm_provider": "openai-codex",
         "llm_model": "gpt-5.6-luna",

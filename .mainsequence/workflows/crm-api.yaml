@@ -63,7 +63,7 @@ resources:
         - key: crm
           policy: user
     spec:
-      source_path: api/agents/crm/main.py
+      source_path: api/tau/main.py
       mcp_applications:
         - resource: crm
       command_center_icon:

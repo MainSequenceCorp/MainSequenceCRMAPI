@@ -57,7 +57,7 @@ class Store:
         if (
             len(sources) != 1
             or providers != {"src.erp.finance:erp-finance"}
-            or revisions != {"0002"}
+            or revisions not in ({"0002"}, {"0003"}, {"0004"})
             or None in providers
         ):
             raise RuntimeError("Finance table finance contains inconsistent revisions or sources")

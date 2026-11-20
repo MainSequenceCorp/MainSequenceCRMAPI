@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from typing import Mapping
 
 from pydantic import ValidationError
 
+from api.erp.collections import decode_filter_object
 from src.erp.crm.models.queries import FILTER_MODELS, QueryScope
 from src.erp.crm.repositories.resources.catalog import ORDER_COLUMNS
 
@@ -33,9 +33,9 @@ def parse_query(resource: str, params: Mapping[str, str], *, discovery: bool = F
     except ValidationError as exc:
         raise _invalid(exc) from exc
     try:
-        raw_filters = json.loads(http.filters)
-    except json.JSONDecodeError as exc:
-        raise QueryError("filters", "Filters must be a JSON object") from exc
+        raw_filters = decode_filter_object(http.filters)
+    except ValueError as exc:
+        raise QueryError("filters", str(exc)) from exc
     try:
         filters = (
             FILTER_MODELS[resource]

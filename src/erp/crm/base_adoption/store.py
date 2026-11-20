@@ -1,5 +1,8 @@
 """CRM-owned portable statements through the governed MetaTables API."""
 
+from functools import lru_cache
+from threading import Lock
+
 from metatables import MetaTable, MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import compile_sqlalchemy_statement, compile_sqlalchemy_statements
 from src.erp.base.store import Store as BaseStore
@@ -12,6 +15,7 @@ class Store:
         self.require_active, self._active_checked = require_active, False
         self.registry = registry
         self.base = BaseStore()
+        self._activation_lock = Lock()
 
     @property
     def data_source_uid(self):
@@ -19,8 +23,10 @@ class Store:
         if str(uid) != self.base.data_source_uid:
             raise RuntimeError("CRM and Base must use the same governed DataSource")
         if self.require_active and not self._active_checked:
-            self.validate_activation(uid)
-            self._active_checked = True
+            with self._activation_lock:
+                if not self._active_checked:
+                    self.validate_activation(uid)
+                    self._active_checked = True
         return uid
 
     def validate_activation(self, uid):
@@ -119,3 +125,9 @@ class Store:
             raise ResourceConflict(
                 "Identity, profile or relationship changed; reload and review"
             ) from error
+
+
+@lru_cache(maxsize=4)
+def active_store(registry):
+    """Share successful Base reconciliation for the process's catalog binding."""
+    return Store(registry, require_active=True)

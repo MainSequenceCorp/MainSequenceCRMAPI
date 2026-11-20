@@ -8,6 +8,7 @@ from sqlalchemy import func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.collections import read_page
 from src.erp.module_access import require_module
 
 from .errors import ProjectsError
@@ -21,19 +22,6 @@ def now():
 
 def key(value):
     return UUID(str(value))
-
-
-def page(items, total, index, size):
-    return {
-        "items": items,
-        "pageInfo": {
-            "pageIndex": index,
-            "pageSize": size,
-            "totalItems": total,
-            "hasNextPage": (index + 1) * size < total,
-            "hasPreviousPage": index > 0,
-        },
-    }
 
 
 class Service:
@@ -107,43 +95,40 @@ class Service:
             )
         if state:
             terms.append(model.state == state)
+        parent = None
         if project_uid:
             if resource != "tasks":
                 raise ProjectsError(422, "filter", "Project filter is only available for tasks")
-            self.row("projects", project_uid)
+            parent = (
+                select(Project.uid).where(Project.uid == key(project_uid)).exists(),
+                ProjectsError(404, "not_found", "Delivery record not found"),
+            )
             terms.append(model.project_uid == key(project_uid))
-        total = int(
-            self.store.read(select(func.count().label("count")).select_from(model).where(*terms))[
-                0
-            ]["count"]
+        return read_page(
+            self.store,
+            model.__table__,
+            terms,
+            (model.created_at.desc(), model.uid),
+            page_index=page_index,
+            page_size=page_size,
+            parent=parent,
         )
-        items = self.store.read(
-            select(model.__table__)
-            .where(*terms)
-            .order_by(model.created_at.desc(), model.uid)
-            .offset(page_index * page_size)
-            .limit(page_size),
-            max_rows=page_size,
-        )
-        return page(items, total, page_index, page_size)
 
     def history(self, task_uid, *, page_index=0, page_size=25):
-        self.row("tasks", task_uid)
-        terms = [TimeEntry.task_uid == key(task_uid)]
-        total = int(
-            self.store.read(
-                select(func.count().label("count")).select_from(TimeEntry).where(*terms)
-            )[0]["count"]
+        self.require("projects.read")
+        task_uid = key(task_uid)
+        return read_page(
+            self.store,
+            TimeEntry.__table__,
+            (TimeEntry.task_uid == task_uid,),
+            (TimeEntry.created_at.desc(), TimeEntry.uid),
+            page_index=page_index,
+            page_size=page_size,
+            parent=(
+                select(DeliveryTask.uid).where(DeliveryTask.uid == task_uid).exists(),
+                ProjectsError(404, "not_found", "Delivery record not found"),
+            ),
         )
-        items = self.store.read(
-            select(TimeEntry.__table__)
-            .where(*terms)
-            .order_by(TimeEntry.created_at.desc(), TimeEntry.uid)
-            .offset(page_index * page_size)
-            .limit(page_size),
-            max_rows=page_size,
-        )
-        return page(items, total, page_index, page_size)
 
     def transact(self, steps):
         try:

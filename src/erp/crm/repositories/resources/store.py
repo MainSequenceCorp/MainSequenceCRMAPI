@@ -38,9 +38,9 @@ class GovernedResourceStore:
             from ...base_adoption.merge import Merge
             from ...base_adoption.reads import Reads
             from ...base_adoption.resources import Resources
-            from ...base_adoption.store import Store
+            from ...base_adoption.store import active_store
 
-            store = Store(binding_registry, require_active=True)
+            store = active_store(binding_registry)
             self.identity_resources = Resources(store)
             self.identity_reads = Reads(store)
             self.affiliations_repo = Affiliations(store)

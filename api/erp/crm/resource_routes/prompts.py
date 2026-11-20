@@ -4,6 +4,8 @@ import uuid
 
 from fastapi import APIRouter, Request
 
+
+from api.erp.collections import collection_get
 from api.erp.crm.route_support import _archive, _collection, _create, _detail, _discovery, _patch
 from src.erp.crm.models.common import VersionCommand
 from src.erp.crm.models.prompts import PromptCreate, PromptPatch
@@ -16,7 +18,7 @@ def discovery(request: Request):
     return _discovery("prompts", request)
 
 
-@router.get("/", name="list-prompts")
+@collection_get(router, "/", name="list-prompts")
 def collection(request: Request):
     return _collection("prompts", request)
 

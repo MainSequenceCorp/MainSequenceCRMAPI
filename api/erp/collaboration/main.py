@@ -8,6 +8,7 @@ from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 
 from mainsequence.server.fastapi import install_request_identity
+from api.erp.collections import PageIndex, PageSize, SearchText
 from src.erp.collaboration.dependencies import Dependencies
 from src.erp.collaboration.errors import CollaborationError
 from src.erp.collaboration.schemas import (
@@ -144,9 +145,9 @@ def create_app(*, enabled=True, local=False, install_identity=True):
 
         @app.get(PREFIX + "/references/projects/")
         def projects(
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
         ):
             svc = service()
             svc.require("collaboration.read")
@@ -161,9 +162,9 @@ def create_app(*, enabled=True, local=False, install_identity=True):
 
         @app.get(PREFIX + "/discussions/")
         def collection(
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
             state: str | None = Query(None, max_length=32),
             project_uid: UUID | None = None,
         ):
@@ -196,8 +197,8 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         @app.get(PREFIX + "/discussions/{uid}/messages/")
         def messages(
             uid: UUID,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
         ):
             return service().messages(uid, page_index=page_index, page_size=page_size)
 
@@ -220,16 +221,16 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         @app.get(PREFIX + "/messages/{uid}/revisions/")
         def revisions(
             uid: UUID,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
         ):
             return service().revisions(uid, page_index=page_index, page_size=page_size)
 
         @app.get(PREFIX + "/discussions/{uid}/audit/")
         def audit(
             uid: UUID,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
         ):
             return service().history(uid, page_index=page_index, page_size=page_size)
 

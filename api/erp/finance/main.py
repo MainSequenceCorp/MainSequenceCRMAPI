@@ -5,10 +5,11 @@ import os
 from typing import Literal
 from uuid import UUID
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
+from api.erp.collections import PageIndex, PageSize, SearchText, collection_get
 from api.erp.base.identity import actor_and_capabilities as base_identity
 from mainsequence.server.fastapi import install_request_identity
 from src.erp.base.service import BaseError
@@ -162,9 +163,9 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         @app.get(PREFIX + "/references/{resource}/")
         def references(
             resource: str,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
         ):
             current = service()
             current.require("finance.read")
@@ -203,9 +204,9 @@ def create_app(*, enabled=True, local=False, install_identity=True):
                 )
             }
 
-        @app.get(PREFIX + "/inventory-valuations/")
+        @collection_get(app, PREFIX + "/inventory-valuations/")
         def inventory_valuations(
-            page_index: int = Query(0, ge=0, le=100000), page_size: int = Query(25, ge=1, le=100)
+            page_index: PageIndex = 0, page_size: PageSize = 25
         ):
             return service().inventory_valuations(page_index=page_index, page_size=page_size)
 
@@ -221,12 +222,12 @@ def create_app(*, enabled=True, local=False, install_identity=True):
                 service().require("finance.read")
                 return discovery(resource)
 
-            @app.get(prefix + "/", name=resource + "-list")
+            @collection_get(app, prefix + "/", name=resource + "-list")
             def collection(
                 request: Request,
-                page_index: int = Query(0, ge=0, le=100000),
-                page_size: int = Query(25, ge=1, le=100),
-                search: str = Query("", max_length=200),
+                page_index: PageIndex = 0,
+                page_size: PageSize = 25,
+                search: SearchText = "",
                 state: Literal["draft", "posted", "void"] | None = None,
             ):
                 if set(request.query_params) - {"page_index", "page_size", "search", "state"}:
@@ -243,11 +244,11 @@ def create_app(*, enabled=True, local=False, install_identity=True):
                     request_uid=payload.request_uid,
                 )
 
-            @app.get(prefix + "/{uid}/allocations/", name=resource + "-allocations")
+            @collection_get(app, prefix + "/{uid}/allocations/", name=resource + "-allocations")
             def allocations(
                 uid: UUID,
-                page_index: int = Query(0, ge=0, le=100000),
-                page_size: int = Query(25, ge=1, le=100),
+                page_index: PageIndex = 0,
+                page_size: PageSize = 25,
             ):
                 return service().allocation_collection(
                     resource, uid, page_index=page_index, page_size=page_size

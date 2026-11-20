@@ -7,6 +7,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
+from api.erp.collections import collection_get
 from src.erp.crm.models.interactions import InteractionCreate, InteractionPatch
 from src.erp.crm.solution_selling.bulk import PrompterDeleteRequest
 from src.erp.crm.solution_selling.models import (
@@ -69,7 +70,7 @@ def _patch(resource: str, request: Request, uid: uuid.UUID, payload: BaseModel):
     return invoke(lambda: service_for(request).update_record(resource, uid, payload))
 
 
-@core_router.get("/")
+@collection_get(core_router, "/")
 def list_interactions(
     request: Request,
     page_index: int = Query(0, ge=0),
@@ -94,7 +95,7 @@ def update_interaction(uid: uuid.UUID, request: Request, payload: InteractionPat
     return _patch("interactions", request, uid, payload)
 
 
-@module_router.get("/assessments/")
+@collection_get(module_router, "/assessments/")
 def list_assessments(
     request: Request,
     page_index: int = Query(0, ge=0),
@@ -119,7 +120,7 @@ def update_assessment(uid: uuid.UUID, request: Request, payload: AssessmentPatch
     return _patch("assessments", request, uid, payload)
 
 
-@module_router.get("/diagnoses/")
+@collection_get(module_router, "/diagnoses/")
 def list_diagnoses(
     request: Request,
     page_index: int = Query(0, ge=0),
@@ -144,7 +145,7 @@ def update_diagnosis(uid: uuid.UUID, request: Request, payload: DiagnosisPatch):
     return _patch("diagnoses", request, uid, payload)
 
 
-@module_router.get("/prospecting-profiles/")
+@collection_get(module_router, "/prospecting-profiles/")
 def list_profiles(
     request: Request,
     page_index: int = Query(0, ge=0),
@@ -169,7 +170,7 @@ def update_profile(uid: uuid.UUID, request: Request, payload: ProspectingProfile
     return _patch("prospecting-profiles", request, uid, payload)
 
 
-@module_router.get("/leads/")
+@collection_get(module_router, "/leads/")
 def list_leads(
     request: Request,
     page_index: int = Query(0, ge=0),
@@ -194,7 +195,7 @@ def update_lead(uid: uuid.UUID, request: Request, payload: LeadPatch):
     return _patch("leads", request, uid, payload)
 
 
-@module_router.get("/prompters/")
+@collection_get(module_router, "/prompters/")
 def list_prompters(
     request: Request,
     page_index: int = Query(0, ge=0),

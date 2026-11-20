@@ -25,8 +25,7 @@ def _query(request: Request, resource: str, *, discovery: bool = False):
 
 def _collection(resource: str, request: Request):
     service = service_for(request)
-    invoke(lambda: service.context.require("crm.read"))
-    return invoke(lambda: service.list_resources(resource, _query(request, resource)))
+    return invoke(lambda: service.list_resources(resource, lambda: _query(request, resource)))
 
 
 def _discovery(resource: str, request: Request):

@@ -8,6 +8,7 @@ from sqlalchemy import func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.collections import read_page
 from src.erp.module_access import require_module
 
 from .errors import CollaborationError
@@ -106,25 +107,9 @@ class Service:
         )
 
     def paginate(self, model, terms, order, *, page_index=0, page_size=25):
-        total = self.count(model, *terms)
-        rows = self.store.read(
-            select(model.__table__)
-            .where(*terms)
-            .order_by(*order)
-            .offset(page_index * page_size)
-            .limit(page_size),
-            max_rows=page_size,
+        return read_page(
+            self.store, model.__table__, terms, order, page_index=page_index, page_size=page_size
         )
-        return {
-            "items": rows,
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
 
     def collection(self, *, page_index=0, page_size=25, search="", state=None, project_uid=None):
         self.require("collaboration.read")

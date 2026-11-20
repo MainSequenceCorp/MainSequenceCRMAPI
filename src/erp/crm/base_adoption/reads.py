@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import String, cast, func, or_, select
 
+from src.erp.collections import decode_json_rows, json_rows, read_page
 from src.erp.crm.contracts import validate_payload
 from src.erp.crm.metatables import MODELS
 from src.erp.crm.repositories.errors import ResourceNotFound
@@ -35,7 +36,18 @@ class Reads:
     def project(self, resource, row, *, collection=False):
         row = dict(row)
         uid = UUID(str(row["uid"]))
-        if resource == "contacts":
+        if collection and resource == "contacts":
+            row["display_name"] = " ".join(row[k] for k in ("first_name", "last_name") if row[k])
+            row["tag_uids"] = [
+                member["tag_uid"]
+                for member in decode_json_rows(row["tag_uids"], table("contact_tag"))
+            ]
+        elif collection and resource == "deals":
+            row["contact_uids"] = [
+                member["contact_uid"]
+                for member in decode_json_rows(row["contact_uids"], table("deal_contact"))
+            ]
+        elif resource == "contacts":
             co, tags, tasks = table("company"), table("contact_tag"), table("task")
             company = (
                 self.store.read(select(co.c.name).where(co.c.uid == UUID(row["company_uid"])))
@@ -64,7 +76,7 @@ class Reads:
                     )
                 ),
             )
-        elif resource == "companies":
+        elif resource == "companies" and not collection:
             contacts, affiliations, deals = (
                 table("contact"),
                 table("contact_company_affiliation"),
@@ -103,8 +115,6 @@ class Reads:
                     max_rows=100,
                 )
             ]
-            if row["amount"] is not None:
-                row["amount"] = format(Decimal(str(row["amount"])), "f")
         elif resource == "activity":
             row = {
                 k: row[k]
@@ -121,6 +131,8 @@ class Reads:
                     "changes",
                 )
             }
+        if resource == "deals" and row["amount"] is not None:
+            row["amount"] = format(Decimal(str(row["amount"])), "f")
         spec = RESOURCE_SPECS[resource]
         if collection and resource == "prompts":
             row.pop("content_markdown", None)
@@ -198,22 +210,64 @@ class Reads:
             if ordering.startswith("-")
             else t.c[key].asc().nulls_last()
         )
-        count = self.count(select(func.count().label("count")).select_from(t).where(*predicates))
-        rows = self.store.read(
-            select(t)
-            .where(*predicates)
-            .order_by(order, t.c.uid)
-            .limit(scope.page_size)
-            .offset(scope.page_index * scope.page_size),
-            max_rows=scope.page_size,
+        result = read_page(
+            self.store,
+            t,
+            predicates,
+            (order, t.c.uid),
+            page_index=scope.page_index,
+            page_size=scope.page_size,
+            projection=self._collection_projection(resource, t),
         )
-        return {
-            "items": [self.project(resource, row, collection=True) for row in rows],
-            "pageInfo": {
-                "pageIndex": scope.page_index,
-                "pageSize": scope.page_size,
-                "totalItems": count,
-                "hasNextPage": (scope.page_index + 1) * scope.page_size < count,
-                "hasPreviousPage": scope.page_index > 0,
-            },
-        }
+        result["items"] = [
+            self.project(resource, row, collection=True) for row in result["items"]
+        ]
+        return result
+
+    @staticmethod
+    def _collection_projection(resource, relation):
+        columns = [column for column in relation.c if resource != "prompts" or column.name != "content_markdown"]
+        if resource == "contacts":
+            company, tags, tasks = table("company"), table("contact_tag"), table("task")
+            tag_rows = (
+                select(tags.c.tag_uid)
+                .where(tags.c.contact_uid == relation.c.uid)
+                .order_by(tags.c.tag_uid)
+                .limit(100)
+                .correlate(relation)
+            )
+            columns.extend((
+                select(company.c.name).where(company.c.uid == relation.c.company_uid)
+                .correlate(relation).scalar_subquery().label("company_name"),
+                json_rows(tag_rows).label("tag_uids"),
+                select(func.count()).select_from(tasks).where(
+                    tasks.c.contact_uid == relation.c.uid,
+                    tasks.c.completed_at.is_(None),
+                    tasks.c.archived_at.is_(None),
+                ).correlate(relation).scalar_subquery().label("open_task_count"),
+            ))
+        elif resource == "companies":
+            contacts, affiliations, deals = (
+                table("contact"), table("contact_company_affiliation"), table("deal")
+            )
+            current = select(affiliations.c.uid).where(
+                affiliations.c.contact_uid == contacts.c.uid,
+                affiliations.c.company_uid == relation.c.uid,
+                affiliations.c.archived_at.is_(None),
+                affiliations.c.status == "current",
+            ).correlate(relation, contacts).exists()
+            columns.extend((
+                select(func.count()).select_from(contacts)
+                .where(contacts.c.archived_at.is_(None), current)
+                .correlate(relation).scalar_subquery().label("contact_count"),
+                select(func.count()).select_from(deals).where(deals.c.company_uid == relation.c.uid)
+                .correlate(relation).scalar_subquery().label("deal_count"),
+            ))
+        elif resource == "deals":
+            links = table("deal_contact")
+            contact_rows = (
+                select(links.c.contact_uid).where(links.c.deal_uid == relation.c.uid)
+                .order_by(links.c.contact_uid).limit(100).correlate(relation)
+            )
+            columns.append(json_rows(contact_rows).label("contact_uids"))
+        return columns

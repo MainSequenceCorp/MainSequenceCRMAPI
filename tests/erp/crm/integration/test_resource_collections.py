@@ -26,6 +26,8 @@ from src.erp.crm.metatables import MODELS, Base
 from src.erp.crm.models.queries import QueryScope
 from src.erp.crm.repositories.resources.catalog import ORDER_COLUMNS, RESOURCE_SPECS
 from src.erp.crm.repositories.resources.reads import ResourceReads
+from src.erp.user_preferences.metatables import EnvironmentModuleActivation
+from tests.erp.crm.conftest import ENVIRONMENT_UID
 
 NOW = datetime(2026, 10, 12, 12, tzinfo=timezone.utc)
 SOURCE = str(uuid.UUID(int=90000))
@@ -129,6 +131,7 @@ def collection_postgres():
         )
         try:
             Base.metadata.create_all(engine)
+            EnvironmentModuleActivation.__table__.create(engine)
             yield engine
         finally:
             engine.dispose()
@@ -393,9 +396,25 @@ def test_postgres_company_projection_and_plain_collection(collection_store):
     assert tags["items"][0]["uid"] == str(TAG)
 
 
-def test_http_pagination_still_checks_fresh_permissions(collection_store, signed_caller):
+def test_http_pagination_still_checks_fresh_permissions(
+    collection_store, collection_db, signed_caller, monkeypatch
+):
     store, calls = collection_store
     actor = uuid.uuid4()
+    policy = EnvironmentModuleActivation.__table__
+    collection_db.execute(
+        policy.insert().values(
+            environment_uid=uuid.UUID(ENVIRONMENT_UID),
+            active_module_keys=["crm"],
+            actor_uid=actor,
+            updated_at=NOW,
+            version=1,
+        )
+    )
+    monkeypatch.setattr(
+        "src.erp.user_preferences.store.configured_store",
+        lambda **_: SimpleNamespace(data_source_uid=uuid.UUID(SOURCE)),
+    )
     grants = {"crm.read"}
     app = create_app()
     app.state.crm_policy = SimpleNamespace(capabilities=lambda _actor: grants)
@@ -416,3 +435,4 @@ def test_http_pagination_still_checks_fresh_permissions(collection_store, signed
         grants.clear()
         assert client.get("/api/crm/v1/contacts/", params={"page_size": "50"}).status_code == 403
     assert len(calls) == 1
+    assert "erp_collection_decision" in calls[0]["statement"]["sql"]

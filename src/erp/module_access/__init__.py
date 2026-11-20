@@ -8,6 +8,8 @@ from metatables import MetaTable, MetaTableTransactionGuardError
 from src.erp.modules import module_closure
 from src.erp.user_preferences.errors import UserPreferencesError
 
+from .collections import collection_admission
+
 
 @dataclass
 class Admission:
@@ -38,6 +40,10 @@ def require_module(module_key: str) -> None:
     current = admission.get()
     if current is not None:
         current.require(module_key)
+    elif (pending := collection_admission.get()) is not None and module_key != pending.module_key:
+        raise UserPreferencesError(
+            503, "module_policy_unavailable", "Cross-module access requires a verified policy"
+        )
 
 
 def require_integration(key: str) -> dict:
@@ -64,7 +70,10 @@ def require_integration(key: str) -> dict:
 
 def module_available(module_key: str) -> bool:
     current = admission.get()
-    return current is None or module_closure((module_key,)) <= current.active
+    if current is not None:
+        return module_closure((module_key,)) <= current.active
+    pending = collection_admission.get()
+    return pending is None or module_key == pending.module_key
 
 
 def admitted_guards(module_key, source_uid):

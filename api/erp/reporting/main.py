@@ -4,10 +4,11 @@ import logging
 from typing import Literal
 from uuid import UUID
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from mainsequence.server.fastapi import install_request_identity
+from api.erp.collections import PageIndex, PageSize, SearchText, collection_get
 from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 from src.erp.reporting.errors import ReportingError
@@ -236,9 +237,9 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         def rows(
             uid: UUID,
             request: Request,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
         ):
             if set(request.query_params) - {"page_index", "page_size", "search"}:
                 raise ReportingError(422, "query", "Unsupported result query")
@@ -276,13 +277,13 @@ def create_app(*, enabled=True, local=False, install_identity=True):
             current().require("reporting.read")
             return discovery(resource)
 
-        @app.get(PREFIX + "/{resource}/")
+        @collection_get(app, PREFIX + "/{resource}/")
         def collection(
             resource: Resource,
             request: Request,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
             state: str | None = None,
         ):
             if (

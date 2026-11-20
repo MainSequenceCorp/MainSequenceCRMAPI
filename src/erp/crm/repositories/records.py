@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel
+from sqlalchemy import and_, func, or_, select
 
+from metatables import MetaTable
+from metatables.compiled_sql.v1 import compile_sqlalchemy_statement
+from src.erp.collections import page_result, read_page
 from src.erp.crm.metatables import MODELS
 from src.erp.crm.models.interactions import Interaction, InteractionCreate
 from src.erp.crm.repositories.errors import ResourceConflict, ResourceNotFound
@@ -25,6 +29,8 @@ from src.erp.crm.solution_selling.models import (
     SolutionSellingPrompter,
     SolutionSellingProspectingProfile,
 )
+from src.erp.module_access import admission
+from src.erp.module_access.collections import collection_admission
 
 
 @dataclass(frozen=True)
@@ -219,6 +225,10 @@ class VersionedRecordStore(GovernedGateway):
         spec = RECORDS[resource]
         if set(filters) - set(spec.filters):
             raise ValueError("Unsupported collection filter")
+        context = collection_admission.get() or admission.get()
+        if context is not None and context.local:
+            reader = self._local_leads if resource == "leads" else self._local_records
+            return reader(spec, page_index=page_index, page_size=page_size, search=search, filters=filters)
         table = MODELS[spec.table].__tablename__
         conditions = ["t.archived_at IS NULL"]
         params: dict[str, Any] = {"limit": page_size, "offset": page_index * page_size}
@@ -257,32 +267,115 @@ class VersionedRecordStore(GovernedGateway):
             f"SELECT COALESCE((SELECT jsonb_agg(to_jsonb({result_table}) - '__row' ORDER BY __row) "
             f"FROM {result_table}), '[]'::jsonb) AS items, (SELECT count(*) FROM q) AS total_items"
         )
-        result = self._operation(
-            operation="select",
-            sql=sql,
-            parameters=params,
-            parameter_types={},
-            max_rows=1,
-        )
+        result = self._collection_operation(sql, params, {})
         rows = result.get("rows")
         if not isinstance(rows, list) or len(rows) != 1:
             raise RuntimeError("Invalid CRM collection response")
         items = self._json(rows[0]["items"], expected=list, label=resource)
         items = [spec.read.model_validate(item).model_dump(mode="json") for item in items]
         total = int(rows[0]["total_items"])
-        return {
-            "items": items,
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
+        return page_result(items, total, page_index, page_size)
+
+    def _local_records(self, spec, *, page_index, page_size, search, filters):
+        relation = MODELS[spec.table].__table__
+        predicates = [relation.c.archived_at.is_(None)]
+        for name, value in filters.items():
+            if spec.table == "interaction" and name == "contact_uid":
+                maximum = next(
+                    rule.max_length for rule in InteractionCreate.model_fields["participants"].metadata
+                    if hasattr(rule, "max_length")
+                )
+                predicates.append(or_(*(
+                    func.json_extract(relation.c.participants, f"$[{index}].contact_uid") == str(value)
+                    for index in range(maximum)
+                )))
+            else:
+                predicates.append(
+                    relation.c[name] == (uuid.UUID(str(value)) if name.endswith("_uid") else value)
+                )
+        if search:
+            predicates.append(or_(*(
+                func.lower(relation.c[name]).contains(search.casefold(), autoescape=True)
+                for name in spec.search
+            )))
+        result = read_page(
+            self, relation, predicates,
+            (relation.c[spec.order].desc().nulls_last(), relation.c.uid.desc()),
+            page_index=page_index, page_size=page_size,
+        )
+        result["items"] = [spec.read.model_validate(row).model_dump(mode="json") for row in result["items"]]
+        return result
+
+    def _local_leads(self, spec, *, page_index, page_size, search, filters):
+        lead, contact, company, task = (
+            MODELS[key].__table__ for key in (spec.table, "contact", "company", "task")
+        )
+        predicates = [lead.c.archived_at.is_(None)]
+        for name, value in filters.items():
+            predicates.append(lead.c[name] == (uuid.UUID(str(value)) if name.endswith("_uid") else value))
+        full_name = func.trim(func.coalesce(contact.c.first_name, "") + " " + func.coalesce(contact.c.last_name, ""))
+        first_email = func.json_extract(contact.c.emails, "$[0].email")
+        related = lead.outerjoin(contact, contact.c.uid == lead.c.contact_uid).outerjoin(
+            company, company.c.uid == contact.c.company_uid
+        )
+        if search:
+            term = search.casefold()
+            # Contact writes and imports share this field limit.
+            from src.erp.crm.models.contacts import ContactCreate
+
+            max_emails = next(
+                rule.max_length for rule in ContactCreate.model_fields["emails"].metadata
+                if hasattr(rule, "max_length")
+            )
+            predicates.append(or_(
+                func.lower(full_name).contains(term, autoescape=True),
+                func.lower(company.c.name).contains(term, autoescape=True),
+                *(
+                    func.lower(func.json_extract(contact.c.emails, f"$[{index}].email"))
+                    .contains(term, autoescape=True)
+                    for index in range(max_emails)
+                ),
+            ))
+        result = read_page(
+            self,
+            lead,
+            predicates,
+            (lead.c.updated_at.desc().nulls_last(), lead.c.uid.desc()),
+            page_index=page_index,
+            page_size=page_size,
+            match_from=related if search else None,
+            from_clause=related.outerjoin(task, and_(
+                task.c.uid == lead.c.next_task_uid,
+                task.c.completed_at.is_(None),
+                task.c.archived_at.is_(None),
+            )),
+            projection=(
+                *lead.c,
+                func.coalesce(func.nullif(full_name, ""), first_email, "Unnamed contact")
+                .label("contact_display_name"),
+                contact.c.company_uid,
+                company.c.name.label("company_name"),
+                task.c.text.label("next_task_text"),
+                task.c.due_at.label("next_task_due_at"),
+            ),
+        )
+        result["items"] = [spec.read.model_validate(row).model_dump(mode="json") for row in result["items"]]
+        return result
 
     def detail(self, resource: str, uid: uuid.UUID) -> dict[str, Any]:
         spec = RECORDS[resource]
+        if resource == "interactions":
+            target = MODELS["interaction"].__table__
+            statement = compile_sqlalchemy_statement(
+                select(target).where(target.c.uid == uid, target.c.archived_at.is_(None)),
+                operation="select",
+                data_source_uid=self.registry.data_source_uid,
+                limits={"max_rows": 1, "statement_timeout_ms": 15000},
+            )
+            rows = MetaTable.execute_operation(statement)["rows"]
+            if not rows:
+                raise ResourceNotFound("interactions record not found")
+            return spec.read.model_validate(rows[0]).model_dump(mode="json")
         table = MODELS[spec.table].__tablename__
         source = f'"{table}"'
         sql = (

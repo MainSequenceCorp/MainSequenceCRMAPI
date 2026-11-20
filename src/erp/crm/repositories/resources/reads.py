@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from src.erp.collections import page_result
+
 from ...contracts import validate_payload
 from ...metatables import MODELS
 from ...models.queries import QueryScope
@@ -49,13 +51,7 @@ class ResourceReads(GovernedGateway):
             f"CROSS JOIN LATERAL ({select_sql} WHERE t.uid=p.uid) item), "
             "'[]'::jsonb) AS items, (SELECT count(*) FROM filtered) AS total_items"
         )
-        result = self._operation(
-            operation="select",
-            sql=sql,
-            parameters=parameters,
-            parameter_types=parameter_types,
-            max_rows=1,
-        )
+        result = self._collection_operation(sql, parameters, parameter_types)
         rows = result.get("rows")
         if not isinstance(rows, list) or len(rows) != 1:
             raise RuntimeError("CRM collection query returned no envelope")
@@ -67,16 +63,7 @@ class ResourceReads(GovernedGateway):
             validate_payload(definition.collection_contract or definition.contract, item)
             for item in items
         ]
-        return {
-            "items": items,
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
+        return page_result(items, total, page_index, page_size)
 
     def detail(self, resource: str, uid: uuid.UUID) -> dict[str, Any]:
         definition = RESOURCE_SPECS[resource]

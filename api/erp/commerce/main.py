@@ -8,6 +8,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 
 from mainsequence.server.fastapi import install_request_identity
+from api.erp.collections import PageIndex, PageSize, SearchText, collection_get
 from src.erp.base.service import BaseError
 from src.erp.catalog.service import CatalogError
 from src.erp.commerce.errors import CommerceError
@@ -182,13 +183,13 @@ def create_app(*, enabled_module=True, local=False, install_identity=True):
             current().require("commerce.read")
             return discovery(resource)
 
-        @app.get(PREFIX + "/{resource}/")
+        @collection_get(app, PREFIX + "/{resource}/")
         def collection(
             resource: Resource,
             request: Request,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
             state: str | None = None,
         ):
             if (
@@ -266,8 +267,8 @@ def create_app(*, enabled_module=True, local=False, install_identity=True):
         def references(
             resource: str,
             page_index: int = Query(0, ge=0),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_size: PageSize = 25,
+            search: SearchText = "",
         ):
             s = current()
             s.require("commerce.read")

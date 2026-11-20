@@ -3,8 +3,13 @@
 import json
 import uuid
 
+from sqlalchemy import String, cast, func, or_, select
+
+from src.erp.collections import page_result, read_page
+
 from src.erp.crm.repositories.errors import ResourceConflict, ResourceNotFound
 from src.erp.crm.repositories.gateway import GovernedGateway
+from src.erp.module_access.collections import collection_admission
 
 from .models import EmailQuery
 
@@ -56,6 +61,9 @@ class EmailStore(GovernedGateway):
         return item
 
     def collection(self, query: EmailQuery):
+        pending = collection_admission.get()
+        if pending is not None and pending.local:
+            return self._sqlite_collection(query)
         clauses = ["e.archived_at IS NULL", "t.archived_at IS NULL", "i.archived_at IS NULL"]
         params = {"limit": query.page_size, "offset": query.page_index * query.page_size}
         for key, value in query.filters.model_dump(exclude_none=True).items():
@@ -73,17 +81,89 @@ class EmailStore(GovernedGateway):
         field = query.ordering.removeprefix("-")
         direction = "DESC" if query.ordering.startswith("-") else "ASC"
         projection = "e.uid, e.version, e.thread_uid, e.sender, e.subject, e.sent_at, e.source, e.body_state, e.original_url, e.created_by_uid, t.actor_uid AS mailbox_owner_uid, t.sync_enabled, t.contact_uid, t.interaction_uid, i.company_uid, i.deal_uid"
-        rows = self.query(f'WITH filtered AS (SELECT {projection} FROM "{MESSAGE}" e '
+        result = self._collection_operation(f'WITH filtered AS (SELECT {projection} FROM "{MESSAGE}" e '
                           f'JOIN "{THREAD}" t ON t.uid=e.thread_uid JOIN "{INTERACTION}" i ON i.uid=t.interaction_uid '
                           f'WHERE {" AND ".join(clauses)}), paged AS (SELECT * FROM filtered '
                           f'ORDER BY "{field}" {direction} NULLS LAST, uid LIMIT %(limit)s OFFSET %(offset)s) '
                           f'SELECT COALESCE((SELECT jsonb_agg(to_jsonb(p) ORDER BY p."{field}" {direction} NULLS LAST, p.uid) FROM paged p), \'[]\'::jsonb) AS items, '
-                          '(SELECT count(*) FROM filtered) AS total_items', params, max_rows=1)
-        row = rows[0]
-        total = int(row["total_items"])
-        return {"items": self._json(row["items"], expected=list, label="emails"), "pageInfo": {
-            "pageIndex": query.page_index, "pageSize": query.page_size, "totalItems": total,
-            "hasNextPage": (query.page_index + 1) * query.page_size < total, "hasPreviousPage": query.page_index > 0}}
+                          '(SELECT count(*) FROM filtered) AS total_items', params, {})
+        row = result["rows"][0]
+        return page_result(
+            self._json(row["items"], expected=list, label="emails"),
+            int(row["total_items"]),
+            query.page_index,
+            query.page_size,
+        )
+
+    def _sqlite_collection(self, query):
+        from src.erp.crm.base_adoption.reads import table
+
+        msg, thread, interaction, links = (
+            table(name)
+            for name in ("email_message", "email_thread", "interaction", "email_lead_link")
+        )
+        predicate = [
+            msg.c.archived_at.is_(None),
+            thread.c.archived_at.is_(None),
+            interaction.c.archived_at.is_(None),
+        ]
+        for name, value in query.filters.model_dump(exclude_none=True).items():
+            if name == "lead_uid":
+                predicate.append(
+                    select(links.c.uid)
+                    .where(
+                        links.c.interaction_uid == thread.c.interaction_uid,
+                        links.c.lead_uid == value,
+                        links.c.archived_at.is_(None),
+                    )
+                    .exists()
+                )
+                continue
+            relation = (
+                interaction
+                if name in {"company_uid", "deal_uid"}
+                else msg
+                if name == "thread_uid"
+                else thread
+            )
+            predicate.append(relation.c[name] == value)
+        if query.search:
+            term = (
+                query.search.casefold()
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
+            predicate.append(
+                or_(
+                    *(
+                        func.lower(cast(msg.c[name], String)).like(f"%{term}%", escape="\\")
+                        for name in ("subject", "sender", "to", "cc", "body_text")
+                    )
+                )
+            )
+        joined = msg.join(thread, thread.c.uid == msg.c.thread_uid).join(
+            interaction, interaction.c.uid == thread.c.interaction_uid
+        )
+        key = query.ordering.removeprefix("-")
+        ordering = msg.c[key].desc() if query.ordering.startswith("-") else msg.c[key].asc()
+        return read_page(
+            self,
+            msg,
+            predicate,
+            (ordering.nulls_last(), msg.c.uid),
+            page_index=query.page_index,
+            page_size=query.page_size,
+            match_from=joined,
+            from_clause=joined,
+            projection=(
+                msg.c.uid, msg.c.version, msg.c.thread_uid, msg.c.sender, msg.c.subject,
+                msg.c.sent_at, msg.c.source, msg.c.body_state, msg.c.original_url,
+                msg.c.created_by_uid, thread.c.actor_uid.label("mailbox_owner_uid"),
+                thread.c.sync_enabled, thread.c.contact_uid, thread.c.interaction_uid,
+                interaction.c.company_uid, interaction.c.deal_uid,
+            ),
+        )
 
     def persist(self, actor, context, messages, *, source_key, source, provider_thread_id=None,
                 thread=None, grant=None, selected_only=False):

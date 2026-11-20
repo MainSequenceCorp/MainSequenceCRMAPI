@@ -27,6 +27,28 @@ def posted(business, resource="invoices", **changes):
     return business["service"].transition(resource, row["uid"], "post", row["version"])
 
 
+def test_filtered_invoices_share_count_and_page_on_populated_data(business, monkeypatch):
+    prefix = f"COLLECTION-{uuid4().hex.upper()}"
+    business["new"]("invoices", name=f"{prefix}-DRAFT")
+    posted(business, name=f"{prefix}-FIRST")
+    newest = posted(business, name=f"{prefix}-SECOND")
+    service = business["service"]
+    read = service.store.read
+    calls = []
+
+    def measured(statement, **kwargs):
+        calls.append(statement)
+        return read(statement, **kwargs)
+
+    monkeypatch.setattr(service.store, "read", measured)
+    page = service.collection("invoices", search=prefix, state="posted", page_size=1)
+    end = service.collection("invoices", search=prefix, state="posted", page_size=1, page_index=2)
+    assert len(calls) == 2
+    assert [item["uid"] for item in page["items"]] == [newest["uid"]]
+    assert page["pageInfo"]["totalItems"] == end["pageInfo"]["totalItems"] == 2
+    assert page["pageInfo"]["hasNextPage"] and end["items"] == []
+
+
 def request(invoice, payment, amount="120", **changes):
     return {
         "request_uid": uuid4(),

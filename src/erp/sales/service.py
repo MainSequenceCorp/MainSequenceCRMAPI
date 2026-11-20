@@ -9,6 +9,7 @@ from sqlalchemy import delete, func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.collections import read_page
 from src.erp.module_access import require_module
 
 from .errors import SalesError
@@ -58,29 +59,14 @@ class Service:
             )
         if state:
             terms.append(Order.state == state)
-        total = int(
-            self.store.read(select(func.count().label("count")).select_from(Order).where(*terms))[
-                0
-            ]["count"]
+        return read_page(
+            self.store,
+            Order.__table__,
+            terms,
+            (Order.created_at.desc(), Order.uid),
+            page_index=page_index,
+            page_size=page_size,
         )
-        items = self.store.read(
-            select(Order.__table__)
-            .where(*terms)
-            .order_by(Order.created_at.desc(), Order.uid)
-            .offset(page_index * page_size)
-            .limit(page_size),
-            max_rows=page_size,
-        )
-        return {
-            "items": items,
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
 
     def transact(self, steps):
         try:

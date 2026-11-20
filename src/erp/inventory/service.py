@@ -1,5 +1,6 @@
 """Exact stock movements and owner-authorized cross-module transaction plans."""
 
+import json
 from datetime import datetime, timezone
 from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Decimal, localcontext
 from functools import wraps
@@ -10,6 +11,7 @@ from sqlalchemy import func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.collections import decode_json_rows, json_rows, read_page
 from src.erp.module_access import require_module
 
 from .errors import InventoryError
@@ -76,30 +78,39 @@ class Service:
         if resource == "balances":
             stock = self.raw("stock-items", row["stock_item_uid"])
             location = self.raw("locations", row["location_uid"])
-            row.update(
-                name=stock["name"],
-                location_name=location["name"],
-                unit_name=stock["snapshot"]["unit_name"],
-                currency_code=stock["snapshot"]["currency_code"],
-            )
-            for name, ticks in [
-                ("on_hand", row["on_hand_ticks"]),
-                ("reserved", row["reserved_ticks"]),
-                ("available", row["on_hand_ticks"] - row["reserved_ticks"]),
-            ]:
-                row[name] = str(Decimal(ticks) * Decimal(stock["increment"]))
-            row["standard_cost_estimate"] = self.value(Decimal(row["on_hand"]), stock)
+            self._balance_fields(row, stock, location["name"])
         if resource == "movements":
             row["entries"] = self.store.read(
                 select(Entry.__table__)
                 .where(Entry.move_uid == key(uid))
                 .order_by(Entry.location_uid)
             )
-            for entry in row["entries"]:
-                entry["quantity"] = str(
-                    Decimal(entry["quantity_ticks"]) * Decimal(row["snapshot"]["increment"])
-                )
+            self._entry_quantities(row)
         return row
+
+    @exact
+    def _balance_fields(self, row, stock, location_name):
+        row.update(
+            name=stock["name"],
+            location_name=location_name,
+            unit_name=stock["snapshot"]["unit_name"],
+            currency_code=stock["snapshot"]["currency_code"],
+        )
+        for name, ticks in (
+            ("on_hand", row["on_hand_ticks"]),
+            ("reserved", row["reserved_ticks"]),
+            ("available", row["on_hand_ticks"] - row["reserved_ticks"]),
+        ):
+            row[name] = str(Decimal(ticks) * Decimal(stock["increment"]))
+        row["standard_cost_estimate"] = self.value(Decimal(row["on_hand"]), stock)
+
+    @staticmethod
+    @exact
+    def _entry_quantities(row):
+        for entry in row["entries"]:
+            entry["quantity"] = str(
+                Decimal(entry["quantity_ticks"]) * Decimal(row["snapshot"]["increment"])
+            )
 
     def count(self, model, *terms):
         return int(
@@ -153,48 +164,75 @@ class Service:
                 )
             else:
                 terms.append(func.lower(model.name).contains(search.lower(), autoescape=True))
-        total = self.count(model, *terms)
-        rows = self.store.read(
-            select(model.uid)
-            .where(*terms)
-            .order_by(model.created_at.desc(), model.uid)
-            .offset(page_index * page_size)
-            .limit(page_size),
-            max_rows=page_size,
+        table = model.__table__
+        projection = list(table.c)
+        source = table
+        if resource == "balances":
+            source = table.outerjoin(StockItem, StockItem.uid == Balance.stock_item_uid).outerjoin(
+                Location, Location.uid == Balance.location_uid
+            )
+            projection.extend((
+                StockItem.name.label("_stock_name"),
+                StockItem.snapshot.label("_stock_snapshot"),
+                StockItem.increment.label("_stock_increment"),
+                StockItem.unit_cost.label("_stock_unit_cost"),
+                Location.name.label("_location_name"),
+            ))
+        elif resource == "movements":
+            entries = (
+                select(Entry.__table__)
+                .where(Entry.move_uid == Move.uid)
+                .order_by(Entry.location_uid)
+                .limit(100)
+                .correlate(table)
+            )
+            projection.append(json_rows(entries).label("entries"))
+        result = read_page(
+            self.store,
+            table,
+            terms,
+            (model.created_at.desc(), model.uid),
+            page_index=page_index,
+            page_size=page_size,
+            projection=projection,
+            from_clause=source,
         )
-        return {
-            "items": [self.get(resource, row["uid"]) for row in rows],
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
+        for row in result["items"]:
+            if resource == "balances":
+                stock = {
+                    name: row.pop(f"_stock_{name}")
+                    for name in ("name", "snapshot", "increment", "unit_cost")
+                }
+                location_name = row.pop("_location_name")
+                if stock["name"] is None or location_name is None:
+                    raise InventoryError(404, "not_found", "Inventory record not found")
+                if isinstance(stock["snapshot"], str):
+                    stock["snapshot"] = json.loads(stock["snapshot"])
+                self._balance_fields(row, stock, location_name)
+            elif resource == "movements":
+                row["entries"] = decode_json_rows(row["entries"], Entry.__table__)
+                self._entry_quantities(row)
+        return result
 
     def history(self, resource, uid, *, page_index=0, page_size=25):
         self.require("inventory.manage")
-        self.raw(resource, uid)
-        terms = [AuditEvent.resource == resource, AuditEvent.record_uid == key(uid)]
-        total = self.count(AuditEvent, *terms)
-        return {
-            "items": self.store.read(
-                select(AuditEvent.__table__)
-                .where(*terms)
-                .order_by(AuditEvent.occurred_at.desc(), AuditEvent.uid)
-                .offset(page_index * page_size)
-                .limit(page_size),
-                max_rows=page_size,
+        self.require("inventory.read")
+        model = RESOURCES.get(resource)
+        if model is None:
+            raise InventoryError(404, "not_found", "Unknown Inventory resource")
+        uid = key(uid)
+        return read_page(
+            self.store,
+            AuditEvent.__table__,
+            (AuditEvent.resource == resource, AuditEvent.record_uid == uid),
+            (AuditEvent.occurred_at.desc(), AuditEvent.uid),
+            page_index=page_index,
+            page_size=page_size,
+            parent=(
+                select(model.uid).where(model.uid == uid).exists(),
+                InventoryError(404, "not_found", "Inventory record not found"),
             ),
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
+        )
 
     def created(self):
         return dict(

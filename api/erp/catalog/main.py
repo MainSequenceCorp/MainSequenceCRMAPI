@@ -10,11 +10,12 @@ from pydantic import Field, create_model
 from sqlalchemy import select
 
 from mainsequence.server.fastapi import install_request_identity
+from api.erp.collections import PageIndex, PageSize, SearchText
 from src.erp.catalog.metatables import RESOURCES, AuditEvent
 from src.erp.catalog.schemas import INPUTS, ConvertInput, VersionInput
 from src.erp.catalog.service import CatalogError, Service
 from src.erp.catalog.store import Store
-from src.erp.module_access.http import install_module_admission
+from src.erp.module_access.http import collection_route, install_module_admission
 from src.erp.modules import resolve_modules
 
 from .identity import actor_and_capabilities
@@ -177,11 +178,12 @@ def create_app(*, enabled=True, local=False, install_identity=True):
                 if set(request.query_params) - allowed:
                     raise CatalogError(422, "invalid_query", "Unsupported Catalog query field")
 
+            @collection_route
             def list_records(
                 request: Request,
-                page_index: int = Query(0, ge=0, le=100000),
-                page_size: int = Query(25, ge=1, le=100),
-                search: str = Query("", max_length=200),
+                page_index: PageIndex = 0,
+                page_size: PageSize = 25,
+                search: SearchText = "",
                 archived: bool = False,
                 kind: Literal["product", "service"] | None = None,
                 group_uid: UUID | None = None,

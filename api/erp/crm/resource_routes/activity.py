@@ -6,6 +6,8 @@ import uuid
 
 from fastapi import APIRouter, Request
 
+
+from api.erp.collections import collection_get
 from api.erp.crm.route_support import _collection, _detail, _discovery
 
 router = APIRouter(prefix="/api/crm/v1/activity")
@@ -16,7 +18,7 @@ def discovery(request: Request):
     return _discovery("activity", request)
 
 
-@router.get("/", name="list-activity")
+@collection_get(router, "/", name="list-activity")
 def collection(request: Request):
     return _collection("activity", request)
 

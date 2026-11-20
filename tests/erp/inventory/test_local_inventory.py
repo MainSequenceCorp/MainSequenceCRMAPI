@@ -35,6 +35,27 @@ def total(svc, stock_uid, loc):
     return svc.balance(stock_uid, loc["uid"])
 
 
+def test_populated_collection_keeps_expanded_fields_in_one_read(stock, monkeypatch):
+    service = stock["service"]
+    movement = stock["complete"](stock["movement"]())
+    expected = service.get("movements", movement["uid"])
+    item = stock["stock"]
+    read = service.store.read
+    calls = []
+
+    def measured(statement, **kwargs):
+        calls.append(statement)
+        return read(statement, **kwargs)
+
+    monkeypatch.setattr(service.store, "read", measured)
+    movements = service.collection("movements", search=movement["name"])
+    balances = service.collection("balances", search=item["name"], stock_item_uid=item["uid"])
+    assert len(calls) == 2
+    assert movements["items"] == [expected]
+    assert balances["pageInfo"]["totalItems"] == len(balances["items"]) == 1
+    assert balances["items"][0]["standard_cost_estimate"] == "25.00"
+
+
 def test_receipt_transfer_reservation_delivery_return_reconciliation(stock):
     f = stock
     s = f["service"]

@@ -10,6 +10,7 @@ from sqlalchemy import delete, func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.collections import read_page
 from src.erp.module_access import require_module
 
 from .errors import FinanceError
@@ -95,38 +96,27 @@ class Service:
         self.require("finance.read")
         model = self.model(resource)
         uid = UUID(str(uid))
-        if not self.store.read(select(model.uid).where(model.uid == uid).limit(1)):
-            raise FinanceError(404, "not_found", "Finance record not found")
         link = Allocation.invoice_uid if resource == "invoices" else Allocation.payment_uid
-        total = int(
-            self.store.read(
-                select(func.count().label("count")).select_from(Allocation).where(link == uid)
-            )[0]["count"]
-        )
-        items = self.store.read(
-            select(
-                Allocation.__table__,
+        return read_page(
+            self.store,
+            Allocation.__table__,
+            (link == uid,),
+            (Allocation.created_at.desc(), Allocation.uid),
+            page_index=page_index,
+            page_size=page_size,
+            projection=(
+                *Allocation.__table__.c,
                 Invoice.name.label("invoice_reference"),
                 Payment.name.label("payment_reference"),
-            )
+            ),
+            from_clause=Allocation.__table__
             .join(Invoice, Invoice.uid == Allocation.invoice_uid)
-            .join(Payment, Payment.uid == Allocation.payment_uid)
-            .where(link == uid)
-            .order_by(Allocation.created_at.desc(), Allocation.uid)
-            .offset(page_index * page_size)
-            .limit(page_size),
-            max_rows=page_size,
+            .join(Payment, Payment.uid == Allocation.payment_uid),
+            parent=(
+                select(model.uid).where(model.uid == uid).exists(),
+                FinanceError(404, "not_found", "Finance record not found"),
+            ),
         )
-        return {
-            "items": items,
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
 
     def collection(self, resource, *, page_index=0, page_size=25, search="", state=None):
         self.require("finance.read")
@@ -141,29 +131,14 @@ class Service:
             )
         if state:
             terms.append(model.state == state)
-        total = int(
-            self.store.read(select(func.count().label("count")).select_from(model).where(*terms))[
-                0
-            ]["count"]
+        return read_page(
+            self.store,
+            model.__table__,
+            terms,
+            (model.created_at.desc(), model.uid),
+            page_index=page_index,
+            page_size=page_size,
         )
-        items = self.store.read(
-            select(model.__table__)
-            .where(*terms)
-            .order_by(model.created_at.desc(), model.uid)
-            .offset(page_index * page_size)
-            .limit(page_size),
-            max_rows=page_size,
-        )
-        return {
-            "items": items,
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
 
     def transact(self, steps):
         try:
@@ -731,29 +706,14 @@ class Service:
     def inventory_valuations(self, *, page_index=0, page_size=25):
         self.require("finance.read")
         terms = [Posting.resource == "inventory", Posting.account_role == "inventory"]
-        total = int(
-            self.store.read(select(func.count().label("count")).select_from(Posting).where(*terms))[
-                0
-            ]["count"]
+        return read_page(
+            self.store,
+            Posting.__table__,
+            terms,
+            (Posting.occurred_at.desc(), Posting.uid),
+            page_index=page_index,
+            page_size=page_size,
         )
-        rows = self.store.read(
-            select(Posting.__table__)
-            .where(*terms)
-            .order_by(Posting.occurred_at.desc(), Posting.uid)
-            .offset(page_index * page_size)
-            .limit(page_size),
-            max_rows=page_size,
-        )
-        return {
-            "items": rows,
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
 
     def plan_from_purchase(self, order, payload):
         """Complete Finance-owned bill plan; caller joins its source/receipt guards."""

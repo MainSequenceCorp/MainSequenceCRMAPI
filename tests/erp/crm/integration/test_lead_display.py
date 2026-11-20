@@ -1,6 +1,7 @@
 """Lead read labels remain derived, governed and separate from write payloads."""
 
 import uuid
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,6 +10,8 @@ from pydantic import ValidationError
 from api.erp.crm.main import create_app
 from src.erp.crm.repositories.records import VersionedRecordStore
 from src.erp.crm.solution_selling.models import LeadChanges, LeadCreate, SolutionSellingLead
+
+SOURCE_UID = uuid.UUID("b4c658ad-4683-43a7-8fe4-79f19c583fb3")
 
 
 def lead(company=True):
@@ -26,12 +29,16 @@ class ReadStore(VersionedRecordStore):
     def __init__(self, records):
         self.records = records
         self.calls = []
+        self.registry = SimpleNamespace(data_source_uid=SOURCE_UID)
 
     def _operation(self, **kwargs):
         self.calls.append(kwargs)
         if "uid" in kwargs["parameters"]:
             return {"rows": [{"item": self.records[0]}]}
-        return {"rows": [{"items": self.records, "total_items": 7}]}
+        page = {"items": self.records, "total_items": 7}
+        if "erp_collection_decision" in kwargs["sql"]:
+            return {"rows": [{"_erp_policy_state": "allowed", "payload": page}]}
+        return {"rows": [page]}
 
 
 def test_display_fields_are_read_only_not_a_second_person_or_company_record():
@@ -61,11 +68,15 @@ def test_collection_enriches_only_page_in_one_governed_read_and_keeps_companyles
     assert result["pageInfo"] == {"pageIndex": 1, "pageSize": 2, "totalItems": 7, "hasNextPage": True, "hasPreviousPage": True}
 
 
-def test_http_list_and_detail_return_same_labels_and_recheck_read_permission(signed_caller):
+def test_http_list_and_detail_return_same_labels_and_recheck_read_permission(signed_caller, monkeypatch):
     actor = uuid.uuid4()
     capabilities = {"crm.read"}
     record = lead()
     store = ReadStore([record])
+    monkeypatch.setattr(
+        "src.erp.user_preferences.store.configured_store",
+        lambda **_: SimpleNamespace(data_source_uid=SOURCE_UID),
+    )
 
     class Policy:
         def capabilities(self, uid):
@@ -81,6 +92,7 @@ def test_http_list_and_detail_return_same_labels_and_recheck_read_permission(sig
     listing = client.get(base)
     detail = client.get(base + record["uid"] + "/")
     assert listing.status_code == detail.status_code == 200
+    assert "erp_collection_decision" in store.calls[0]["sql"]
     assert listing.json()["items"][0] == detail.json()
     assert detail.json()["company_name"] == "Example Capital"
     assert "WHERE t.uid=%(uid)s::uuid AND t.archived_at IS NULL" in store.calls[1]["sql"]

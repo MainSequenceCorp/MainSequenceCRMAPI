@@ -57,6 +57,9 @@ def test_shared_mcp_admits_each_module_without_weakening_crm_rest(monkeypatch):
     monkeypatch.setenv("ERP_USER_PREFERENCES_PROVISIONED_MODULES", ",".join(MODULES))
     monkeypatch.setenv("FINANCE_SALES_ENABLED", "true")
     monkeypatch.setattr(identity, "_users_me", verify)
+    monkeypatch.setattr(
+        "src.erp.crm.platform.hosted_runtime.PlatformPolicy.capabilities", lambda *_: set()
+    )
     monkeypatch.setattr("src.erp.user_preferences.admission.configured_store", lambda **_: object())
     monkeypatch.setattr("src.erp.user_preferences.admission.read_policy", read_policy)
     monkeypatch.setattr("src.erp.user_preferences.service.read_policy", read_policy)

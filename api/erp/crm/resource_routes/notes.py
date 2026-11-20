@@ -6,6 +6,8 @@ import uuid
 
 from fastapi import APIRouter, Request
 
+
+from api.erp.collections import collection_get
 from api.erp.crm.route_support import _archive, _collection, _create, _detail, _discovery, _patch
 from src.erp.crm.models.common import VersionCommand
 from src.erp.crm.models.notes import NoteCreate, NotePatch
@@ -18,7 +20,7 @@ def discovery(request: Request):
     return _discovery("notes", request)
 
 
-@router.get("/", name="list-notes")
+@collection_get(router, "/", name="list-notes")
 def collection(request: Request):
     return _collection("notes", request)
 

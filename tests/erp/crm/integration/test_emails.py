@@ -14,12 +14,15 @@ from fastapi.testclient import TestClient
 
 from api.erp.crm.main import create_app
 from metatables import MetaTableCompiledSQLOperation
+from metatables.compiled_sql.v1 import compile_sqlalchemy_statement
 from src.erp.crm.emails.gmail import GmailEmails
 from src.erp.crm.google_workspace.security import Sealer
 from src.erp.crm.metatables import Base, MODELS
 from src.erp.crm.repositories.errors import ResourceConflict
 from src.erp.crm.repositories.records import VersionedRecordStore
 from src.erp.crm.repositories.resources.store import GovernedResourceStore
+from src.erp.user_preferences.metatables import EnvironmentModuleActivation
+from tests.erp.crm.conftest import ENVIRONMENT_UID
 
 SOURCE = str(uuid.UUID(int=99001))
 
@@ -45,6 +48,7 @@ def email_postgres():
                     raise
                 time.sleep(.2)
         Base.metadata.create_all(engine)
+        EnvironmentModuleActivation.__table__.create(engine)
         yield engine
         engine.dispose()
     finally:
@@ -69,12 +73,32 @@ def email_api(email_postgres, monkeypatch, signed_caller, config_file):
         actor = uuid.uuid4()
         grants = {'crm.read', 'crm.create', 'crm.edit', 'crm.archive', 'crm.transfer.import'}
         def execute(payload):
-            MetaTableCompiledSQLOperation.model_validate(payload)
+            operation = MetaTableCompiledSQLOperation.model_validate(payload)
+            if not isinstance(payload, dict):
+                payload = operation.model_dump(mode="json")
             assert payload['data_source_uid'] == SOURCE
             calls.append(payload)
             return {'rows': [dict(row) for row in db.exec_driver_sql(payload['statement']['sql'], payload['statement']['parameters']).mappings()]}
         monkeypatch.setattr('src.erp.crm.repositories.gateway.MetaTable.execute_operation', execute)
+        monkeypatch.setattr(
+            "src.erp.crm.repositories.records.compile_sqlalchemy_statement",
+            lambda *args, **options: compile_sqlalchemy_statement(
+                *args, **options, dialect="postgresql", paramstyle="pyformat"
+            ),
+        )
         registry = SimpleNamespace(data_source_uid=SOURCE)
+        policy = EnvironmentModuleActivation.__table__
+        db.execute(policy.insert().values(
+            environment_uid=uuid.UUID(ENVIRONMENT_UID),
+            active_module_keys=["crm"],
+            actor_uid=actor,
+            updated_at=datetime.now(UTC),
+            version=1,
+        ))
+        monkeypatch.setattr(
+            "src.erp.user_preferences.store.configured_store",
+            lambda **_: SimpleNamespace(data_source_uid=uuid.UUID(SOURCE)),
+        )
         store = GovernedResourceStore(registry)
         source_uid, grant_uid = uuid.uuid4(), uuid.uuid4()
         now = datetime.now(UTC)

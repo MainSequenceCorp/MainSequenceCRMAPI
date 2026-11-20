@@ -63,6 +63,11 @@ visible controls and columns; pipelines currently have no discovery route.
 | `ordering` | A published key, optionally prefixed with `-` |
 | `filters` | URL-encoded JSON object of that resource's semantic filters |
 
+Each supplied filter is combined with search and the resource's authorized
+scope before calculating the count or selecting page IDs. A past-end page
+returns an empty `items` list and keeps the exact matching total. Filter
+objects reject repeated keys.
+
 Core resource collections select the requested page of filtered record IDs
 before computing full records and display-only related fields. Only that
 page is returned. `totalItems` is an exact count of all matches using the same
@@ -74,6 +79,10 @@ Deal amounts sort numerically while remaining decimal strings in responses.
 Collection items retain the authored contract normalization, matching detail
 responses for values such as timezone-aware timestamps and fractional seconds.
 Database JSON formatting does not bypass this response boundary.
+The shared ERP collection route checks the Environment activation policy in
+the same governed read as the page. Base-adopting CRM verifies the identity
+reconciliation for the process's catalog binding before serving collections.
+The fresh per-request capability and module activation checks still apply.
 
 Discovery accepts only `search` and `filters`; it rejects pagination and
 ordering. Unknown parameters and filter keys are rejected. UUID filters must

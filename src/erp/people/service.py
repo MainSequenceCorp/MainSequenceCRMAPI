@@ -8,6 +8,7 @@ from sqlalchemy import func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.collections import read_page
 from src.erp.module_access import require_module
 
 from .errors import PeopleError
@@ -93,34 +94,28 @@ class Service:
             terms.append(func.lower(model.name).contains(search.lower(), autoescape=True))
         if state:
             terms.append(model.state == state)
+        parent = None
         if employee_uid:
             if resource != "absences":
                 raise PeopleError(422, "filter", "Employee filter requires absence requests")
-            self.row("employees", employee_uid)
+            parent = (
+                select(Employee.uid).where(Employee.uid == key(employee_uid)).exists(),
+                PeopleError(404, "not_found", "People record not found"),
+            )
             terms.append(model.employee_uid == key(employee_uid))
         if operating_company_uid:
             if resource == "absences":
                 raise PeopleError(422, "filter", "Company filter requires departments or employees")
             terms.append(model.operating_company_uid == key(operating_company_uid))
-        total = self.count(model, *terms)
-        items = self.store.read(
-            select(model.__table__)
-            .where(*terms)
-            .order_by(model.name, model.uid)
-            .offset(page_index * page_size)
-            .limit(page_size),
-            max_rows=page_size,
+        return read_page(
+            self.store,
+            model.__table__,
+            terms,
+            (model.name, model.uid),
+            page_index=page_index,
+            page_size=page_size,
+            parent=parent,
         )
-        return {
-            "items": items,
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
 
     def transact(self, steps):
         try:

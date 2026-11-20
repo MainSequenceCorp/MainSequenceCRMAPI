@@ -10,6 +10,7 @@ from pydantic import Field, create_model
 from sqlalchemy import select
 
 from mainsequence.server.fastapi import install_request_identity
+from api.erp.collections import PageIndex, PageSize, SearchText
 from src.erp.base.metatables import RESOURCES, AuditEvent
 from src.erp.base.schemas import INPUTS, AllocationInput, RoundInput, VersionInput
 from src.erp.base.service import BaseError, Service
@@ -165,9 +166,9 @@ def create_app(*, enabled=True, local=False, install_identity=True):
             )
 
             def list_records(
-                page_index: int = Query(0, ge=0, le=100000),
-                page_size: int = Query(25, ge=1, le=100),
-                search: str = Query("", max_length=200),
+                page_index: PageIndex = 0,
+                page_size: PageSize = 25,
+                search: SearchText = "",
                 archived: bool = False,
                 kind: str | None = None,
             ):

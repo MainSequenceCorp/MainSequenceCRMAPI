@@ -7,6 +7,7 @@ ports. No model-provided actor or capability value is accepted here.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
@@ -186,8 +187,12 @@ class CRMOperations:
             raise self._invalid("owner_uid")
 
     # Canonical core resource CRUD.
-    def list_resources(self, resource: str, scope: QueryScope) -> dict[str, Any]:
+    def list_resources(
+        self, resource: str, scope: QueryScope | Callable[[], QueryScope]
+    ) -> dict[str, Any]:
         self.context.require("crm.read")
+        if callable(scope):
+            scope = scope()
         return self.resources.collection(resource, validate_scope(resource, scope))
 
     def get_resource(self, resource: str, uid: uuid.UUID) -> dict[str, Any]:

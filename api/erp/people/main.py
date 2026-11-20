@@ -8,6 +8,7 @@ from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
+from api.erp.collections import PageIndex, PageSize, SearchText, collection_get
 from api.erp.base.identity import actor_and_capabilities as base_identity
 from mainsequence.server.fastapi import install_request_identity
 from src.erp.base.service import BaseError
@@ -161,9 +162,9 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         @app.get(PREFIX + "/references/{resource}/")
         def references(
             resource: str,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
             operating_company_uid: UUID | None = None,
         ):
             svc = service()
@@ -256,8 +257,8 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         def audit(
             resource: str,
             uid: UUID,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
         ):
             svc = service()
             svc.row(resource, uid)
@@ -286,12 +287,12 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         def detail(resource: str, uid: UUID):
             return service().get(resource, uid)
 
-        @app.get(PREFIX + "/{resource}/")
+        @collection_get(app, PREFIX + "/{resource}/")
         def collection(
             resource: str,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
             state: str | None = Query(None, max_length=32),
             employee_uid: UUID | None = None,
             operating_company_uid: UUID | None = None,

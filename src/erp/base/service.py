@@ -9,6 +9,7 @@ from sqlalchemy import and_, func, insert, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.collections import read_page
 from src.erp.base.metatables import RESOURCES, Allocation, AuditEvent
 from src.erp.base.schemas import INPUTS
 
@@ -79,29 +80,14 @@ class Service:
             predicates.append(table.c.kind == kind)
         if search:
             predicates.append(func.lower(table.c.name).contains(search.lower(), autoescape=True))
-        total = int(
-            self.store.read(
-                select(func.count().label("count")).select_from(table).where(*predicates)
-            )[0]["count"]
+        return read_page(
+            self.store,
+            table,
+            predicates,
+            (table.c.name, table.c.uid),
+            page_index=page_index,
+            page_size=page_size,
         )
-        rows = self.store.read(
-            select(table)
-            .where(*predicates)
-            .order_by(table.c.name, table.c.uid)
-            .offset(page_index * page_size)
-            .limit(page_size),
-            max_rows=page_size,
-        )
-        return {
-            "items": rows,
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
 
     def audit(self, resource, uid, action, version, fields):
         return insert(AuditEvent.__table__).values(

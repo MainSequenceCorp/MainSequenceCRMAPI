@@ -1,11 +1,11 @@
 """Thin email HTTP adapters; Google source operations stay under /extensions/google/."""
 
-import json
 import uuid
 
 from fastapi import APIRouter, Request
 from pydantic import ValidationError
 
+from api.erp.collections import collection_get, decode_filter_object
 from api.erp.crm.google_routes import router as google_router
 from api.erp.crm.query import QueryError
 from api.erp.crm.query_models import CollectionQuery, DiscoveryQuery
@@ -38,7 +38,7 @@ def operations(request):
 def parse_email_query(params, discovery=False):
     try:
         query = (DiscoveryQuery if discovery else CollectionQuery).model_validate(dict(params))
-        filters = EmailFilters.model_validate(json.loads(query.filters))
+        filters = EmailFilters.model_validate(decode_filter_object(query.filters))
         return EmailQuery(search=query.search, filters=filters, **({} if discovery else {
             "page_index": query.page_index, "page_size": query.page_size, "ordering": query.ordering or "-sent_at"}))
     except (ValidationError, ValueError, TypeError) as exc:
@@ -63,7 +63,7 @@ def discovery(request: Request):
                                      ("source", "Source", "text", "tertiary", {})]]}, "bulk_actions": []}
 
 
-@router.get("/")
+@collection_get(router, "/")
 def list_emails(request: Request):
     return invoke(lambda: operations(request).list(parse_email_query(request.query_params)))
 

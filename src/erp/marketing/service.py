@@ -8,6 +8,7 @@ from sqlalchemy import delete, func, insert, or_, select, update
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
+from src.erp.collections import decode_json_rows, json_rows, read_page
 from src.erp.module_access import admission, require_module
 
 from .errors import MarketingError
@@ -107,24 +108,9 @@ class Service:
         return row
 
     def paginate(self, model, terms, order, *, page_index=0, page_size=25):
-        total = self.count(model, *terms)
-        return {
-            "items": self.store.read(
-                select(model.__table__)
-                .where(*terms)
-                .order_by(*order)
-                .offset(page_index * page_size)
-                .limit(page_size),
-                max_rows=page_size,
-            ),
-            "pageInfo": {
-                "pageIndex": page_index,
-                "pageSize": page_size,
-                "totalItems": total,
-                "hasNextPage": (page_index + 1) * page_size < total,
-                "hasPreviousPage": page_index > 0,
-            },
-        }
+        return read_page(
+            self.store, model.__table__, terms, order, page_index=page_index, page_size=page_size
+        )
 
     def collection(
         self, resource, *, search="", state=None, page_index=0, page_size=25, mailing_uid=None
@@ -141,8 +127,8 @@ class Service:
                 raise MarketingError(
                     422, "mailing_required", "Choose a mailing to inspect its audience"
                 )
-            self.raw("mailings", mailing_uid)
-            terms.append(Recipient.mailing_uid == key(mailing_uid))
+            mailing_uid = key(mailing_uid)
+            terms.append(Recipient.mailing_uid == mailing_uid)
             if search:
                 matching = select(Subscriber.uid).where(
                     or_(
@@ -160,34 +146,91 @@ class Service:
                     ).contains(search.lower(), autoescape=True),
                 )
             )
-        result = self.paginate(
+        if resource == "recipients":
+            return self._recipient_page(terms, mailing_uid, page_index, page_size)
+        return self.paginate(
             model,
             terms,
             [model.created_at.desc(), model.uid],
             page_index=page_index,
             page_size=page_size,
         )
-        if resource == "recipients":
-            result["items"] = [self.get(resource, row["uid"]) for row in result["items"]]
+
+    def _recipient_page(self, terms, mailing_uid, page_index, page_size):
+        recipients = Recipient.__table__
+        events = (
+            select(DeliveryEvent.__table__)
+            .where(DeliveryEvent.recipient_uid == Recipient.uid)
+            .order_by(DeliveryEvent.occurred_at.desc(), DeliveryEvent.uid)
+            .limit(25)
+            .correlate(recipients)
+        )
+        result = read_page(
+            self.store,
+            recipients,
+            terms,
+            (Recipient.created_at.desc(), Recipient.uid),
+            page_index=page_index,
+            page_size=page_size,
+            projection=(
+                *recipients.c,
+                Subscriber.name,
+                Subscriber.email,
+                Subscriber.party_uid,
+                Mailing.name.label("mailing_name"),
+                Mailing.version.label("mailing_version"),
+                Mailing.state.label("mailing_state"),
+                json_rows(events).label("events"),
+            ),
+            from_clause=recipients
+            .outerjoin(Subscriber, Subscriber.uid == Recipient.subscriber_uid)
+            .outerjoin(Mailing, Mailing.uid == Recipient.mailing_uid),
+            parent=(
+                select(Mailing.uid).where(Mailing.uid == mailing_uid).exists(),
+                MarketingError(404, "not_found", "Marketing record not found"),
+            ),
+        )
+        for row in result["items"]:
+            if row["name"] is None or row["mailing_name"] is None:
+                raise MarketingError(404, "not_found", "Marketing record not found")
+            row["mode"] = "local_capture"
+            row["events"] = decode_json_rows(row["events"], DeliveryEvent.__table__)
         return result
 
-    def events(self, uid, **query):
-        self.raw("recipients", uid)
-        return self.paginate(
-            DeliveryEvent,
-            [DeliveryEvent.recipient_uid == key(uid)],
-            [DeliveryEvent.occurred_at.desc(), DeliveryEvent.uid],
-            **query,
+    def events(self, uid, *, page_index=0, page_size=25):
+        self.require("marketing.read")
+        uid = key(uid)
+        return read_page(
+            self.store,
+            DeliveryEvent.__table__,
+            (DeliveryEvent.recipient_uid == uid,),
+            (DeliveryEvent.occurred_at.desc(), DeliveryEvent.uid),
+            page_index=page_index,
+            page_size=page_size,
+            parent=(
+                select(Recipient.uid).where(Recipient.uid == uid).exists(),
+                MarketingError(404, "not_found", "Marketing record not found"),
+            ),
         )
 
-    def history(self, resource, uid, **query):
+    def history(self, resource, uid, *, page_index=0, page_size=25):
         self.require("marketing.manage")
-        self.raw(resource, uid)
-        return self.paginate(
-            AuditEvent,
-            [AuditEvent.resource == resource, AuditEvent.record_uid == key(uid)],
-            [AuditEvent.occurred_at.desc(), AuditEvent.uid],
-            **query,
+        self.require("marketing.read")
+        model = RESOURCES.get(resource)
+        if model is None:
+            raise MarketingError(404, "not_found", "Unknown Marketing resource")
+        uid = key(uid)
+        return read_page(
+            self.store,
+            AuditEvent.__table__,
+            (AuditEvent.resource == resource, AuditEvent.record_uid == uid),
+            (AuditEvent.occurred_at.desc(), AuditEvent.uid),
+            page_index=page_index,
+            page_size=page_size,
+            parent=(
+                select(model.uid).where(model.uid == uid).exists(),
+                MarketingError(404, "not_found", "Marketing record not found"),
+            ),
         )
 
     def created(self):

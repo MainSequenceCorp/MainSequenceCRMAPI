@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 
+from api.erp.collections import PageIndex, PageSize, SearchText, collection_get
 from api.erp.base.identity import actor_and_capabilities as base_identity
 from mainsequence.server.fastapi import install_request_identity
 from src.erp.base.service import BaseError
@@ -157,9 +158,9 @@ def create_app(*, enabled=True, local=False, install_identity=True):
 
         @app.get(PREFIX + "/references/people/")
         def people(
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
         ):
             svc = service()
             svc.require("marketing.read")
@@ -176,9 +177,9 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         @app.get(PREFIX + "/references/tasks/")
         def tasks(
             party_uid: UUID,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
         ):
             svc = service()
             svc.require("marketing.read")
@@ -191,12 +192,12 @@ def create_app(*, enabled=True, local=False, install_identity=True):
             service().require("marketing.read")
             return discovery(resource)
 
-        @app.get(PREFIX + "/{resource}/")
+        @collection_get(app, PREFIX + "/{resource}/")
         def collection(
             resource: Resource,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
             state: str | None = Query(None, max_length=32),
         ):
             return service().collection(
@@ -223,12 +224,12 @@ def create_app(*, enabled=True, local=False, install_identity=True):
                 expected_version=payload.expected_version,
             )
 
-        @app.get(PREFIX + "/mailings/{uid}/recipients/")
+        @collection_get(app, PREFIX + "/mailings/{uid}/recipients/")
         def recipients(
             uid: UUID,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
             state: str | None = Query(None, max_length=32),
         ):
             return service().collection(
@@ -274,11 +275,11 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         def followup(uid: UUID, payload: FollowupInput):
             return service().link_followup(uid, payload.model_dump())
 
-        @app.get(PREFIX + "/recipients/{uid}/events/")
+        @collection_get(app, PREFIX + "/recipients/{uid}/events/")
         def events(
             uid: UUID,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
         ):
             return service().events(uid, page_index=page_index, page_size=page_size)
 
@@ -286,12 +287,12 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         def get(resource: Resource, uid: UUID):
             return service().get(resource, uid)
 
-        @app.get(PREFIX + "/{resource}/{uid}/audit/")
+        @collection_get(app, PREFIX + "/{resource}/{uid}/audit/")
         def audit(
             resource: Literal["subscribers", "mailings", "recipients"],
             uid: UUID,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
         ):
             return service().history(resource, uid, page_index=page_index, page_size=page_size)
 

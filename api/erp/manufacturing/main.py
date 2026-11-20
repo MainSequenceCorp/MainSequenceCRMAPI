@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 
+from api.erp.collections import PageIndex, PageSize, SearchText, collection_get
 from api.erp.base.identity import actor_and_capabilities as base_identity
 from api.erp.catalog.identity import actor_and_capabilities as catalog_identity
 from api.erp.inventory.identity import actor_and_capabilities as inventory_identity
@@ -173,13 +174,13 @@ def create_app(*, enabled=True, local=False, install_identity=True):
             service().require("manufacturing.read")
             return discovery(resource)
 
-        @app.get(PREFIX + "/{resource}/")
+        @collection_get(app, PREFIX + "/{resource}/")
         def collection(
             resource: Resource,
             request: Request,
-            page_index: int = Query(0, ge=0, le=100000),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_index: PageIndex = 0,
+            page_size: PageSize = 25,
+            search: SearchText = "",
             state: str | None = None,
         ):
             if (
@@ -238,8 +239,8 @@ def create_app(*, enabled=True, local=False, install_identity=True):
         def references(
             resource: str,
             page_index: int = Query(0, ge=0),
-            page_size: int = Query(25, ge=1, le=100),
-            search: str = Query("", max_length=200),
+            page_size: PageSize = 25,
+            search: SearchText = "",
         ):
             s = service()
             s.require("manufacturing.read")

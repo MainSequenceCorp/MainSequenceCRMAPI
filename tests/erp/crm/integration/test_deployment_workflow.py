@@ -15,7 +15,6 @@ from src.erp.modules import MODULES, resolve_modules
 
 ROOT = Path(__file__).resolve().parents[4]
 WORKFLOWS = ROOT / ".mainsequence" / "workflows"
-ERP_RELEASE_POLICY = {"enabled": True, "tag_regex": None}
 RUNTIME_TAG_POLICY = {"enabled": True, "tag_regex": r"^v[0-9]+[.][0-9]+[.][0-9]+-erp-api$"}
 SOURCE = str(UUID(int=18249))
 BASE_CRM_PROVIDERS = (
@@ -106,7 +105,7 @@ def test_the_repository_has_one_workflow_file():
     assert sorted(path.name for path in WORKFLOWS.iterdir()) == ["crm-api.yaml"]
 
 
-def test_main_push_promotes_the_shared_api_after_the_migration():
+def test_release_tag_promotes_the_shared_api_then_assistant_after_the_migration():
     workflow = _workflow()
     assert (workflow["api_version"], workflow["name"]) == ("3.0.0", "crm-api")
     resources = {item["key"]: item for item in workflow["resources"]}
@@ -117,7 +116,7 @@ def test_main_push_promotes_the_shared_api_after_the_migration():
     assert (ROOT / crm["source_path"]).is_file()
     assert crm["mcp_enabled"] is True
     assert crm["automatic_deployment"] is True
-    assert crm["automatic_redeployment"] == ERP_RELEASE_POLICY
+    assert crm["automatic_redeployment"] == RUNTIME_TAG_POLICY
     assert {route["path"] for route in crm["public_ingress"]} == {
         "/extensions/google/oauth/callback/",
         "/extensions/google/oauth/done/",
@@ -125,7 +124,7 @@ def test_main_push_promotes_the_shared_api_after_the_migration():
 
     job = resources["migrate-crm"]["spec"]
     assert job["execution_path"] == "jobs/migrate_crm.py"
-    assert job["automatic_redeployment"] == ERP_RELEASE_POLICY
+    assert job["automatic_redeployment"] == RUNTIME_TAG_POLICY
     assert job["env_vars"] == crm["env_vars"]
     config = {item["name"]: item["value"] for item in job["env_vars"]}
     UUID(config["ERP_USER_PREFERENCES_DATA_SOURCE_UID"])
@@ -136,6 +135,12 @@ def test_main_push_promotes_the_shared_api_after_the_migration():
             "image": {"prepare_image": "crm"},
             "migrate": {"run_job": "migrate-crm", "image_from": "image", "needs": ["image"]},
             "deploy_api": {"deploy": "crm", "image_from": "image", "needs": ["migrate"]},
+            "image_assistant": {"prepare_image": "crm-assistant"},
+            "deploy_assistant": {
+                "deploy": "crm-assistant",
+                "image_from": "image_assistant",
+                "needs": ["deploy_api", "image_assistant"],
+            },
         }
     }
 
@@ -159,7 +164,7 @@ def test_registered_api_requires_erp_settings_in_hosted_mode(monkeypatch):
 def test_the_assistant_kept_its_declaration_when_it_moved_into_this_file():
     resources = {item["key"]: item for item in _workflow()["resources"]}
     assert resources["crm-assistant"]["spec"] == {
-        "source_path": "api/agents/crm/main.py",
+        "source_path": "api/tau/main.py",
         "mcp_applications": [{"resource": "crm"}],
         "llm_provider": "openai-codex",
         "llm_model": "gpt-5.6-luna",

@@ -8,10 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import select
 
-from metatables import MetaTable
-from metatables.compiled_sql.v1 import compile_sqlalchemy_statement
 from src.erp.crm.metatables import MODELS
 from src.erp.crm.models.interactions import Interaction, InteractionCreate
 from src.erp.crm.repositories.errors import ResourceConflict, ResourceNotFound
@@ -286,18 +283,6 @@ class VersionedRecordStore(GovernedGateway):
 
     def detail(self, resource: str, uid: uuid.UUID) -> dict[str, Any]:
         spec = RECORDS[resource]
-        if resource == "interactions":
-            target = MODELS["interaction"].__table__
-            statement = compile_sqlalchemy_statement(
-                select(target).where(target.c.uid == uid, target.c.archived_at.is_(None)),
-                operation="select",
-                data_source_uid=self.registry.data_source_uid,
-                limits={"max_rows": 1, "statement_timeout_ms": 15000},
-            )
-            rows = MetaTable.execute_operation(statement)["rows"]
-            if not rows:
-                raise ResourceNotFound("interactions record not found")
-            return spec.read.model_validate(rows[0]).model_dump(mode="json")
         table = MODELS[spec.table].__tablename__
         source = f'"{table}"'
         sql = (

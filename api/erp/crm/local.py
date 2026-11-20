@@ -29,19 +29,14 @@ from mainsequence.client import User
 from mainsequence.client.exceptions import AuthenticationError, PermissionDeniedError
 from mainsequence.client.utils import get_authorization_headers
 from src.erp.crm.google_workspace.config import google_workspace_enabled
-from src.erp.crm.platform.catalog import configured_registry
-from src.erp.crm.platform.local_runtime import build_local_services
 from src.erp.crm.platform.readiness_errors import report_readiness_failure
 
 from .main import _error
 from .main import create_app as create_crm_app
+from .service_adapter import bind_local_crm_request
 
 LOCAL_SIGN_IN_TIMEOUT_SECONDS = 20
 LOCAL_SIGN_IN_CACHE_SECONDS = 300
-GOOGLE_PUBLIC_ROUTES = (
-    ("GET", "/extensions/google/oauth/callback/"),
-    ("GET", "/extensions/google/oauth/done/"),
-)
 # A direct caller cannot claim an identity or present a credential. The only
 # user in this explicit local mode is the account signed into the SDK process.
 CALLER_HEADERS = frozenset(
@@ -67,8 +62,9 @@ def _is_loopback(request: Request) -> bool:
 
 
 def _anonymous_routes() -> tuple[tuple[str, str], ...]:
-    """Allow the loopback health probe and the enabled Google callback."""
-    google = GOOGLE_PUBLIC_ROUTES if google_workspace_enabled() else ()
+    """Allow the loopback health check and the enabled Google callback."""
+    google = (("GET", "/extensions/google/oauth/callback/"),
+              ("GET", "/extensions/google/oauth/done/")) if google_workspace_enabled() else ()
     return (("GET", "/healthz"), *google)
 
 
@@ -218,8 +214,7 @@ def install_local_identity(application: FastAPI, *, shared_erp: bool = False) ->
         path = request.scope["path"]
         uses_crm = (
             not shared_erp
-            or path == "/mcp"
-            or path.startswith(("/api/crm/", "/extensions/", "/mcp/"))
+            or path.startswith(("/api/crm/", "/extensions/"))
         )
         try:
             if uses_crm:
@@ -233,20 +228,12 @@ def install_local_identity(application: FastAPI, *, shared_erp: bool = False) ->
             return _sign_in_failure(request, stage, error)
         if uses_crm:
             try:
-                registry = configured_registry()
-                policy, directory, bootstrap = build_local_services(
-                    signed_user=signed_user,
-                    registry=registry,
-                )
+                bind_local_crm_request(request, signed_user)
             except Exception:
                 return JSONResponse(
                     {"detail": "The local CRM dataset is unavailable."},
                     status_code=503,
                 )
-            request.state.crm_registry = registry
-            request.state.crm_policy = policy
-            request.state.crm_directory = directory
-            request.state.crm_bootstrap = bootstrap
         # The installed request identity verifies this credential with
         # MAINSEQUENCE_ENDPOINT/api/v1/users/me/, binds that user as the caller
         # and removes the header before any route runs. The local policy grants

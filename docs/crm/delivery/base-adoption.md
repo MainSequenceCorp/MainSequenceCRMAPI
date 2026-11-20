@@ -35,25 +35,17 @@ actor nulls and timestamps are retained in provenance; the new audit identifies
 the verified extraction actor. Dates remain at their known precision.
 
 Activation requires field reconciliation and an unchanged inventory. A partial
-copy cannot pass the adoption runtime's readiness checks. Restart both APIs with
-`CRM_BASE_ADOPTION=1`, explicitly configuring the CRM process with
-`configure_local_client()` before launch. The shared ERP frontend remains on
-port 5175. The startup switch does not perform migrations or extraction. Reproducible
-local launch commands, in separate terminals after activation:
+copy cannot pass the adoption runtime's readiness checks. Restart the shared ERP
+API with `CRM_BASE_ADOPTION=1` and the reviewed
+`ERP_USER_PREFERENCES_DATA_SOURCE_UID` and
+`ERP_USER_PREFERENCES_PROVISIONED_MODULES`. The frontend remains on port 5175.
 
 ```bash
-CRM_BASE_ADOPTION=1 .venv/bin/python -m uvicorn api.erp.base.local:create_app --factory --host 127.0.0.1 --port 38651
-.venv/bin/python -m scripts.erp.crm.serve_local_with_base --source-uid LOCAL_SOURCE_UUID
+CRM_BASE_ADOPTION=1 .venv/bin/uvicorn api.erp.local:create_app --factory --host 127.0.0.1 --port 38641
 ```
 
-The CRM launcher verifies the pinned local source and completed activation
-before serving loopback requests. It never prepares or copies data at startup.
-
-Base remains the identity authority. CRM's retained identity columns are an
-atomic compatibility projection for its existing queries and consumers. Shared
-edits use Base-owned command plans; application composition installs the CRM
-projection contributor. The owner writes each table. Missing consumers fail
-closed. Removing the old projection columns is a later reviewed change.
+The launcher verifies the pinned local source. CRM readiness verifies the
+completed adoption. Startup performs zero migrations or extraction writes.
 
 ## Recovery and release
 
@@ -70,6 +62,5 @@ local identity verification does not claim all extension workflows were ported.
 The Google contact creation storage path is integrated; no live Google import or
 external OAuth claim follows from local fixtures.
 
-A hosted release must separately approve the Base and CRM migration/deployment
-sequence, write pause, module-specific tags, namespace grants, exact artifact
-revisions and the shared ERP build. No hosted cutover occurs in this step.
+Hosted cutover requires approval of the Base and CRM adoption sequence, write
+pause, namespace grants, exact ERP API revision and compatible site artifact.

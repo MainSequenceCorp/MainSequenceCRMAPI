@@ -11,6 +11,8 @@ from .metatables import (
     ADMISSION_MODELS,
     MODELS,
     OWNER_NAMESPACE,
+    ConnectorRegistryRevision,
+    IntegrationActivationChange,
 )
 from .scope import configured_source, require_local_runtime
 
@@ -37,6 +39,10 @@ class Store:
 
     def _matches_binding(self, row, model):
         expected_namespaces = {OWNER_NAMESPACE, *getattr(model, "__metatable_namespaces__", ())}
+        revisions = {
+            ConnectorRegistryRevision: {"0003"},
+            IntegrationActivationChange: {"0002", "0003"},
+        }.get(model, {"0001", "0002", "0003"})
         return (
             row.physical_table_name == model.__tablename__
             and row.physical_schema in (None, "", "public")
@@ -45,7 +51,7 @@ class Store:
             and row.migration_namespace == OWNER_NAMESPACE
             and expected_namespaces <= {namespace.name for namespace in row.namespaces}
             and row.migration_provider_key == f"src.erp.user_preferences:{OWNER_NAMESPACE}"
-            and row.alembic_revision in {"0001", "0002", "0003"}
+            and row.alembic_revision in revisions
             and str(row.data_source_uid) == str(self.source_uid)
         )
 

@@ -19,23 +19,25 @@ shown under [verification](verification.md).
 
 ## Run the API locally
 
-The loopback-only launcher is `api.erp.crm.local:app`. It represents the one
-human already signed in through this repository's Main Sequence SDK session:
+The shared ERP loopback API represents the person signed in through the Main
+Sequence SDK. Verify the ready local SQLite source, then provide
+`ERP_USER_PREFERENCES_DATA_SOURCE_UID` and
+`ERP_USER_PREFERENCES_PROVISIONED_MODULES` for the reviewed local policy.
+For adopted CRM identities, set `CRM_BASE_ADOPTION=1` after reconciliation.
 
 ```bash
-set -a
-source .env
-set +a
-uv run uvicorn api.erp.crm.local:app --host 127.0.0.1 --port 38641
+uv run uvicorn api.erp.local:create_app --factory --host 127.0.0.1 --port 38641
 ```
 
-Keep `.env` private. Do not expose the local launcher through a public proxy:
-it cannot distinguish multiple browser users. The deployed entrypoint remains
-`api.erp.crm.main:app`, which verifies the platform-signed caller of each request
-(see [request conventions](../api/conventions.md#identity-and-scope)). Vite
-proxies `/api/` and `/extensions/` to the local loopback listener during
-frontend development without adding a credential. Core CRM routes use
-`/api/crm/v1/`; optional module API routes use `/extensions/<module>/`.
+The deployment workflow uses `api.erp.main:app` and keeps the existing CRM
+resource identity. Vite sends `/api/` and `/extensions/` to the shared local
+listener. Core CRM routes use `/api/crm/v1/`. CRM extensions continue to use
+`/extensions/<module>/`. The `api.erp.crm.local:app` entry remains available
+for isolated CRM development and tests.
+
+Keep local credentials private and keep the loopback launcher off public
+proxies. The deployed API verifies the platform-signed caller of each request.
+See [request conventions](../api/conventions.md#identity-and-scope).
 
 The launcher builds that same application. Outside a deployment its request
 identity runs in local mode, and the launcher refuses to start where
@@ -59,17 +61,13 @@ the matching `crm.readiness_check_failed` log identifies `local-sign-in-user`
 or `local-sign-in-token` and the safe exception type/upstream status without
 logging credentials, raw exceptions or tracebacks.
 If protected routes stall or return `503`, check the Main Sequence
-`/api/v1/users/me/` response and the SDK sign-in; Google authorization cannot
-start until that identity check succeeds.
-`/healthz` and the exact Google callback and completion-page routes need no
-sign-in. The launcher declares them as public ingress for the application it
-creates and marks their requests as the platform gateway does, so they run
-without a caller, as the Google routes do in the deployed API. OAuth state
-and the provider exchange still validate the callback.
-The backend mounts optional modules from the strict, persisted
-`config/erp/crm/settings.yaml` and reports those same values in bootstrap. Both
-`extensions.solution_selling.active` and `extensions.google_workspace.active`
-are `true` in this repository. Changing the file requires an API restart.
+`/api/v1/users/me/` response and the SDK sign-in. The loopback CRM launcher
+exposes only `/healthz` without sign-in. GoogleConnector validates the Google
+callback and provider exchange on its own listener.
+The backend mounts Solution Selling and Campaigns using the validated
+`config/erp/crm/settings.yaml` and reports the values in bootstrap. Changing
+the file requires an API restart. ERP Settings controls GoogleConnector
+availability.
 Normal policy checks still govern each request. See the
 [single-bootstrap ADR](../crm_core/adrs/0004-single-bootstrap-and-assistant-runtime.md)
 for the one-request initialization and assistant runtime contract. The YAML
@@ -83,6 +81,7 @@ attempts platform Agent resolution or reports the assistant unavailable.
 
 `GET /healthz` only checks that the process responds. Protected CRM readiness
 has additional dependencies described in [service and settings API](../api/service.md).
+
 Bootstrap runs its synchronous platform readiness work in the API worker pool,
 so a slow catalog read does not block the event loop or `/healthz`. The local
 signed-user lookup has a 20-second response deadline and the request
@@ -191,11 +190,10 @@ physical contracts even when they report `already current`. See the
 [0.1.33 migration verification](verification.md#metatables-0133-upgrade-and-push-preflight-2026-10-10)
 for the repaired metadata-refresh and SQLite downgrade behavior.
 
-The isolated local runtime checks the migration history and catalog binding,
-not the running CRM API. The CRM loopback launcher does not call
-`configure_local_client()`, so it discovers the Environment's hosted MetaTables
-API, and its business queries use PostgreSQL SQL. SQLite verification does not
-prove those production commands or hosted table permissions.
+The shared loopback launcher pins the verified local SQLite DataSource and
+uses it for the running ERP API. The isolated legacy CRM launcher relies on
+explicit client setup by its caller. Some CRM operations use PostgreSQL SQL.
+Their production behavior and hosted grants require separate verification.
 
 ## Collection query regression checks
 
@@ -224,21 +222,23 @@ The MetaTables transport is captured for these tests: they verify SQL and
 application behavior, not hosted authorization or end-to-end latency. Platform
 cold starts remain expected behavior and are outside this query change.
 
-## Optional Google Workspace extension
+## Optional Google Workspace connector
 
-The [Google Workspace module setup guide](../google_workspace_module/setup.md)
-lists the Google Cloud project, APIs, consent screen, OAuth Web client, exact
-callback pattern, and runtime values. Set
-`extensions.google_workspace.active: true` in `config/erp/crm/settings.yaml` to mount its
-routes and include `modules.google_workspace=true` in bootstrap. The
-frontend uses that bootstrap value and the user's import capability to show
-the module. It never reads the YAML itself. Keep the
-client ID, client secret, and 32-byte token-encryption key in separate Main Sequence
-Secrets. `GOOGLE_OAUTH_REDIRECT_URI` is the API environment value. The
-process expects the `0008` catalog bindings, which hosted environments receive
-from the deployment workflow's migration Job. The loopback launcher is
-single-user only; use a separately registered localhost Web OAuth client for
-local consent testing, never the production client.
+Use a verified private local SQLite DataSource shared by the CRM, Settings
+and GoogleConnector test processes. The connector owns the registered
+Google callback. CRM can serve separately using the Base-adoption launcher
+with `--port 38640` if the callback uses port 38641. Point
+`CRM_LOCAL_API_ORIGIN` in Vite and `ERP_GOOGLE_CONTACTS_CRM_LOCAL_ORIGIN`
+in GoogleConnector to the CRM listener.
+
+The repeatable three-service integration test is
+`tests/erp/crm/integration/test_google_contacts_connector_live_local.py`.
+Set `CRM_LIVE_CONTACTS_CONNECTOR_PROJECT` to the connector checkout. It
+starts separate loopback services, verifies the SQLite DataSource, applies
+the application migrations, and uses synthetic OAuth and provider responses
+for Contacts, Calendar and Gmail operations. It uses a fresh Ed25519 pair
+for CRM's delegated Google reads. A live Google consent check also requires
+the exact registered loopback callback and a consenting Google test user.
 
 ## Optional Tau runtime
 
@@ -265,14 +265,14 @@ acceptance still requires the completed artifact and fresh API comparison above.
 
 ### Local pre-push checks
 
-Install the repository hook with:
+Install the repository hook from the API checkout:
 
 ```bash
 git config --local core.hooksPath .githooks
 ```
 
-The hook verifies the checked-out revision, runs focused local ERP and CRM
-contract tests, and builds the API documentation in strict mode.
+The hook checks the committed revision, runs the local ERP and CRM contract
+tests, and builds the API documentation in strict mode.
 
 ### Optional live assistant smoke test
 
@@ -309,7 +309,7 @@ and applying the CRM provider. It validates fresh catalog bindings and settings
 before starting CRM/Tau. Neither the developer's ordinary local database nor the
 hosted database is selected or migrated. The MCP/business smoke calls remain
 read-only. PostgreSQL-specific Contact queries are verified separately against
-the deployed runtime; the SQLite gate does not claim their portability.
+the deployed runtime.
 If legacy credentials in `.env` override the saved CLI login, repair
 the sign-in with `.venv/bin/mainsequence refresh-token`; never print or copy
 the token values. The developer also needs Reader access to the CRM namespace

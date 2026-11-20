@@ -24,10 +24,9 @@ misreported as a successful import.
 
 See the [transfer API](../api/transfers.md) for the exact mounted paths.
 
-The optional [Google Workspace module](../google_workspace_module/index.md)
-uses a separate user-authorized connection, bounded previews, and explicit
-per-item decisions for Google Contacts, Gmail correspondents, and Calendar
-meetings. It does not use the file-upload adapters or durable transfer jobs;
-its source identity and CRM activity are written with each reviewed record.
-Its routes mount only when `extensions.google_workspace.active: true` in
-`config/erp/crm/settings.yaml`.
+ERP Settings controls access to the optional
+[GoogleConnector workflows](../google_workspace_module/index.md) for Google
+Contacts, Gmail correspondents, and Calendar meetings. A separate,
+user-authorized connection provides bounded previews and explicit per-item
+decisions. CRM writes the source identity and activity with each reviewed
+record.

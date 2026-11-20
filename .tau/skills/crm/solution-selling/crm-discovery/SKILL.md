@@ -5,10 +5,10 @@ description: Prepare Solution Selling conversations, record diagnosis questions 
 
 # Discovery and Deal evidence
 
-Read [shared MCP guidance](skill://crm-core/references/mcp-usage.md). Resolve Deals with
-[crm-deals](skill://crm-deals/SKILL.md), Contact/Interaction records with
-[CRM core](skill://crm-core/SKILL.md), and reusable hypotheses/questions with
-[prospecting](skill://solution-selling/crm-prospecting/SKILL.md).
+Read [shared MCP guidance](skill://crm/crm-core/references/mcp-usage.md). Resolve Deals with
+[crm-deals](skill://crm/crm-deals/SKILL.md), Contact/Interaction records with
+[CRM core](skill://crm/crm-core/SKILL.md), and reusable hypotheses/questions with
+[prospecting](skill://crm/solution-selling/crm-prospecting/SKILL.md).
 
 ## Tool selection
 

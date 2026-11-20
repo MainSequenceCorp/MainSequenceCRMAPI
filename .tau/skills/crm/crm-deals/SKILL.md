@@ -5,9 +5,9 @@ description: Find, create and edit CRM Deals, review pipelines and stages, and m
 
 # Deals and pipelines
 
-Read [shared MCP guidance](skill://crm-core/references/mcp-usage.md). Use
-[CRM core](skill://crm-core/SKILL.md) for Contact, Company, owner and settings lookups;
-use [discovery](skill://solution-selling/crm-discovery/SKILL.md) for an opportunity's
+Read [shared MCP guidance](skill://crm/crm-core/references/mcp-usage.md). Use
+[CRM core](skill://crm/crm-core/SKILL.md) for Contact, Company, owner and settings lookups;
+use [discovery](skill://crm/solution-selling/crm-discovery/SKILL.md) for an opportunity's
 Solution Selling evidence.
 
 ## Tool selection

@@ -1,19 +1,19 @@
 ---
 name: crm-core
-description: Operate everyday CRM records through MCP. Use for Contacts, Companies, employment history, Notes, tags, activity, Tasks, Interactions, read-only Agent Prompts, owner selection, settings and Contact merge previews. Route Deal pipeline work, Solution Selling workflows and Campaign graphs to their dedicated skills.
+description: Operate everyday CRM records through MCP. Use for Contacts, Companies, employment history, Notes, tags, activity, Tasks, Interactions, read-only Agent Prompts, owner selection, settings and Contact merge previews. Route Deal pipeline work, Solution Selling workflows and Outreach Sequence graphs to their dedicated skills.
 ---
 
 # Everyday CRM work
 
 Read [shared MCP guidance](references/mcp-usage.md) for discovery, caller
 permissions, pagination, writes and error recovery. Apply the section needed
-for the request. Use [Deals](skill://crm-deals/SKILL.md) for opportunities and boards;
+for the request. Use [Deals](skill://crm/crm-deals/SKILL.md) for opportunities and boards;
 use the Solution Selling skills for
-[prospecting](skill://solution-selling/crm-prospecting/SKILL.md),
-[draft rendering](skill://solution-selling/crm-prompters/SKILL.md) or
-[discovery](skill://solution-selling/crm-discovery/SKILL.md); use
-[Campaigns](skill://crm-campaigns/SKILL.md) for multi-step outreach graphs,
-enrollment and campaign task execution. A Task created by a campaign is
+[prospecting](skill://crm/solution-selling/crm-prospecting/SKILL.md),
+[draft rendering](skill://crm/solution-selling/crm-prompters/SKILL.md) or
+[discovery](skill://crm/solution-selling/crm-discovery/SKILL.md); use
+[Outreach Sequences](skill://crm/crm-outreach-sequences/SKILL.md) for multi-step outreach graphs,
+enrollment and sequence task execution. A Task created by an outreach sequence is
 completed through that skill's outcome command, not `crm_tasks_complete`.
 
 ## Tool selection
@@ -47,7 +47,7 @@ a requested new record, and update to change a selected existing record.
    stay omitted. Contact social URLs use the advertised `socials` object; do
    not copy a Company's separate `linkedin_url` field onto a Contact.
    For a Contact being added for prospecting, follow the
-   [prospecting Company prerequisite](skill://solution-selling/crm-prospecting/SKILL.md):
+   [prospecting Company prerequisite](skill://crm/solution-selling/crm-prospecting/SKILL.md):
    resolve or create its actual Company first and include the confirmed UID
    in `payload.company_uid`. An unresolved Company blocks that Contact save.
 3. For a requested edit, read the latest detail and patch only the intended

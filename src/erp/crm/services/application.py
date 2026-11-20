@@ -109,8 +109,8 @@ class BootstrapService:
             "default_pipeline_uid": str(default_pipeline_uid),
             "modules": {
                 "solution_selling": solution_selling_enabled(),
+                "outreach_sequences": campaigns_enabled(),
                 "google_workspace": google_workspace_enabled(),
-                "campaigns": campaigns_enabled(),
             },
             "limits": {
                 "list_page_max": 100,

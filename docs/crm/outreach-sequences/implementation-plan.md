@@ -1,5 +1,8 @@
 # Campaigns implementation plan
 
+This historical plan uses the original Campaigns names. See the
+[Outreach Sequences API](../api/outreach-sequences.md) for current routes and tools.
+
 **Status:** Executed on 2026-10-24; see the [module index](index.md) for the
 implemented surfaces and [verification](../delivery/verification.md#campaigns-module-2026-10-24)
 for the executed checks. The contract decisions are recorded as ADR amendments.

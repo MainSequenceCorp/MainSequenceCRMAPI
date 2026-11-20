@@ -5,9 +5,9 @@ description: Select or maintain Solution Selling prompters, inspect their suppor
 
 # Render a draft with a prompter
 
-Read [shared MCP guidance](skill://crm-core/references/mcp-usage.md). Use
-[CRM core](skill://crm-core/SKILL.md) to resolve people and organizations and
-[prospecting](skill://solution-selling/crm-prospecting/SKILL.md) for Lead/profile selection
+Read [shared MCP guidance](skill://crm/crm-core/references/mcp-usage.md). Use
+[CRM core](skill://crm/crm-core/SKILL.md) to resolve people and organizations and
+[prospecting](skill://crm/solution-selling/crm-prospecting/SKILL.md) for Lead/profile selection
 and the complete outreach workflow. Prospecting outreach always uses a saved
 prompter: read the user's indicated template, or create one first when none is
 indicated. This applies to introductions, follow-ups and conversation preparation.

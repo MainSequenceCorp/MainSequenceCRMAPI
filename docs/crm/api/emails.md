@@ -1,17 +1,17 @@
 # Email history API
 
-**Status: implemented and deployed. Saved-email reads and the Lead import form
-were verified live; actual Google import and a second-user session remain
-unverified.**
+**Status** Email history is deployed. The GoogleConnector provider cutover is
+implemented locally and awaiting hosted verification.
 The accepted [ADR 0002](../google_workspace_module/adrs/0002-selected-email-history.md)
 workflow supports selected historical batches and explicit Lead associations.
 Private/team visibility and an unattended worker are outside this release.
 
 All core routes use the verified effective caller. `GET` requires `crm.read`.
-Manual creation additionally requires `crm.create`. Provider operations are mounted
-only with Google Workspace enabled and require `crm.transfer.import` plus read.
-Import additionally needs create; enabling/refreshing sync also needs edit. Only
-the source mailbox owner can change or refresh its thread selection.
+Manual creation additionally requires `crm.create`. Gmail source operations
+require the Gmail integration in shared ERP Settings, `crm.transfer.import`,
+and read. Import additionally needs create, and enabling and refreshing sync
+also need edit. The mailbox owner can stop a saved selection with read and
+edit access while the provider connection is unavailable.
 
 `crm.read` admits shared saved history, including bodies, across the authorised
 CRM instance; the importing actor is provenance and source-sync authority, not a
@@ -19,6 +19,15 @@ read-visibility restriction. All list/detail/search/MCP reads use this same poli
 Only the connected owner can search/preview/import from their Gmail account.
 Import must explicitly describe the shared audience; Gmail source access is
 never granted to other users by an email record or its original URL.
+
+GoogleConnector verifies the current grant, reads Gmail and seals bounded
+reviews. CRM signs each connector request for the verified actor, approved
+operation, exact CRM context or thread selection, and current connection
+generation. CRM validates source fingerprints through the connector and
+writes publication and sync results with its own module-policy, grant,
+record, and selection guards. Reconnecting the same mailbox through
+GoogleConnector keeps existing conversation identities and sync cutoffs.
+A preview created before the cutover must be reviewed again.
 
 | Method | Path | Behavior |
 | --- | --- | --- |
@@ -59,8 +68,8 @@ Selection body: `{"expected_version": 1, "enabled": true}`. New enrollment fixes
 a server timestamp boundary; disabling stops updates, re-enabling starts a new
 boundary, and reconnect alone preserves the prior boundary. Refresh returns
 thread UID, version, last check time and `has_more`; large backlogs need another
-check. The server rechecks grant/account/selection at commit and never scans
-unselected threads. Thread metadata is inspected before eligible new message
+check. The connector rechecks the exact saved selection with CRM before reading
+message bodies. CRM rechecks grant, account, and selection when it commits. Thread metadata is inspected before eligible new message
 bodies are fetched; each run stops at 25 messages, about 20 seconds of retrieval
 work, or a 2 MiB batch boundary and reports any remaining backlog. Payloads over 8 MiB, unsupported bodies
 fail safely. Ordinary errors are redacted 422 validation, 403 permissions,

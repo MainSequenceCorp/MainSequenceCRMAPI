@@ -57,7 +57,7 @@ class ReadyBootstrap:
                 "list_page_max": 100, "bulk_explicit_max": 200,
                 "upload_bytes_max": 20971520, "transfer_rows_max": 20000,
             },
-            "modules": {"solution_selling": True, "google_workspace": True, "campaigns": True},
+            "modules": {"solution_selling": True, "outreach_sequences": True},
         }
 
 
@@ -70,16 +70,14 @@ def ready_client(caller):
     return TestClient(app, headers=caller(ACTOR))
 
 
-def test_persisted_extension_configuration_ignores_old_environment_switches(config_file, monkeypatch):
+def test_persisted_extension_configuration_ignores_old_environment_switch(config_file, monkeypatch):
     monkeypatch.setenv("INCLUDE_SOLUTION_SELLING", "false")
-    monkeypatch.setenv("INCLUDE_GOOGLE_WORKSPACE_EXTENSION", "false")
     paths = create_app().openapi()["paths"]
     assert "/extensions/solution-selling/leads/" in paths
-    assert "/extensions/google/oauth/callback/" in paths
 
 
 def test_invalid_persisted_configuration_fails_at_app_boot(config_file):
-    config_file(google_workspace=False)
+    config_file()
     from src.erp.crm.config import CONFIG_PATH
 
     CONFIG_PATH.write_text("extensions:\n  solution_selling:\n    active: true\n", encoding="utf-8")
@@ -94,6 +92,9 @@ def test_bootstrap_serializes_readiness_and_unavailable_assistant(monkeypatch, s
     assert response.status_code == 200
     payload = Bootstrap.model_validate(response.json())
     assert payload.readiness.status.value == "ready"
+    assert payload.modules == {
+        "solution_selling": True, "outreach_sequences": True, "campaigns": True,
+    }
     assert payload.assistant.enabled is False
 
 

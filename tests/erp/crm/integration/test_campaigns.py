@@ -14,7 +14,6 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from tests.erp.crm.agent.test_mcp_tools import call, rpc
 
 from api.erp.crm.main import create_app
 from api.erp.crm.mcp_tools import build_crm_tools
@@ -32,6 +31,7 @@ from src.erp.crm.campaigns.service import CampaignOperations
 from src.erp.crm.contracts import DomainValidationError
 from src.erp.crm.repositories.errors import ResourceConflict
 from src.erp.crm.services.operations import AccessDenied, CRMContext, ServiceUnavailable
+from tests.erp.crm.agent.test_mcp_tools import call, rpc
 
 ACTOR = uuid.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 AGENT = uuid.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
@@ -451,23 +451,39 @@ def app_for(policy, store):
     return app
 
 
-def test_module_routes_and_tools_follow_persisted_config(config_file):
+def test_outreach_sequence_routes_and_tools_follow_persisted_config(config_file):
+    paths = "/extensions/outreach-sequences/"
+    tools_prefix = "crm_outreach_sequences_"
     config_file(campaigns=False)
     disabled = create_app().openapi()["paths"]
-    assert not any(path.startswith("/extensions/campaigns/") for path in disabled)
-    assert not any("campaign" in tool.definition.name for tool in build_crm_tools(lambda: None))
+    assert not any(path.startswith(paths) for path in disabled)
+    assert not any(
+        tool.definition.name.startswith(tools_prefix) for tool in build_crm_tools(lambda: None)
+    )
     config_file(campaigns=True)
     enabled = create_app().openapi()["paths"]
-    for resource in ("campaigns", "prompts", "participants"):
-        assert {"get", "post"} <= set(enabled[f"/extensions/campaigns/{resource}/"])
-        assert {"get", "patch"} <= set(enabled[f"/extensions/campaigns/{resource}/{{uid}}/"])
-    for command in ("prepare", "advance", "complete", "wait", "block", "report", "reconcile"):
-        assert "post" in enabled[f"/extensions/campaigns/tasks/{command}/"]
+    assert not any(path.startswith("/extensions/campaigns/") for path in enabled)
+    assert not any(path.startswith(paths + "campaigns/") for path in enabled)
+    for resource in ("sequences", "prompts", "participants"):
+        assert {"get", "post"} <= set(enabled[f"{paths}{resource}/"])
+        assert {"get", "patch"} <= set(enabled[f"{paths}{resource}/{{uid}}/"])
+    for action in ("archive", "restore", "graph/validate", "graph"):
+        assert "post" in enabled[f"{paths}sequences/{{uid}}/{action}/"]
+    task_commands = ("prepare", "advance", "complete", "wait", "block", "report", "reconcile")
+    for command in task_commands:
+        assert "post" in enabled[f"{paths}tasks/{command}/"]
     tools = {tool.definition.name: tool.definition for tool in build_crm_tools(lambda: None)}
-    assert len([name for name in tools if "campaign" in name]) == 21
-    assert tools["crm_campaign_tasks_prepare"].annotations.read_only_hint is True
-    assert tools["crm_campaigns_graph_validate"].annotations.read_only_hint is True
-    assert tools["crm_campaign_tasks_advance"].annotations.read_only_hint is False
+    assert not any(name.startswith(("crm_campaign_", "crm_campaigns_")) for name in tools)
+    assert {name for name in tools if name.startswith(tools_prefix)} == {
+        *(tools_prefix + command for command in ("list", "get", "create", "update",
+                                                  "graph_validate", "graph_update")),
+        *(f"{tools_prefix}{resource}_{command}" for resource in ("prompts", "participants")
+          for command in ("list", "get", "create", "update")),
+        *(f"{tools_prefix}tasks_{command}" for command in task_commands),
+    }
+    assert tools["crm_outreach_sequences_tasks_prepare"].annotations.read_only_hint is True
+    assert tools["crm_outreach_sequences_graph_validate"].annotations.read_only_hint is True
+    assert tools["crm_outreach_sequences_tasks_advance"].annotations.read_only_hint is False
 
 
 def test_mcp_and_http_share_the_campaign_service(signed_caller):
@@ -477,24 +493,29 @@ def test_mcp_and_http_share_the_campaign_service(signed_caller):
     with TestClient(app_for(policy, mcp_store), headers=delegated) as mcp:
         http = TestClient(app_for(policy, http_store), headers=signed_caller(ACTOR))
         create = {"name": "Dubai", "objective": "# Win", "owner_uid": str(ACTOR), "context": {"offer": "GPU"}}
-        result = call(mcp, "crm_campaigns_create", {"payload": create})
-        response = http.post("/extensions/campaigns/campaigns/", json=create)
+        result = call(mcp, "crm_outreach_sequences_create", {"payload": create})
+        response = http.post("/extensions/outreach-sequences/sequences/", json=create)
         assert response.status_code == 201, response.text
         assert result["structuredContent"] == {"code": "ok", "data": response.json()}
         assert mcp_store.calls[0][2] == http_store.calls[0][2] == {}
         assert mcp_store.calls[0][1][1]["context"] == {"offer": "GPU"}
         advance = {"participant_uid": str(uuid.UUID(int=77)), "expected_version": 1}
-        result = call(mcp, "crm_campaign_tasks_advance", advance)
-        response = http.post("/extensions/campaigns/tasks/advance/", json=advance)
+        result = call(mcp, "crm_outreach_sequences_tasks_advance", advance)
+        response = http.post("/extensions/outreach-sequences/tasks/advance/", json=advance)
         assert response.status_code == 200, response.text
         assert result["structuredContent"]["data"]["created"] is True and response.json()["created"] is True
         prepare = {"participant_uid": str(uuid.UUID(int=77)), "step_uid": str(SEND)}
-        assert call(mcp, "crm_campaign_tasks_prepare", prepare)["structuredContent"]["data"]["ready"] is True
-        assert http.post("/extensions/campaigns/tasks/prepare/", json=prepare).json()["ready"] is True
-        assert call(mcp, "crm_campaigns_get", {"uid": str(uuid.UUID(int=99)), "actor_uid": "spoof"})["structuredContent"]["code"] == "invalid_arguments"
-        assert http.get("/extensions/campaigns/participants/?status=bogus").status_code == 422
+        assert call(mcp, "crm_outreach_sequences_tasks_prepare", prepare)["structuredContent"]["data"]["ready"] is True
+        assert http.post("/extensions/outreach-sequences/tasks/prepare/", json=prepare).json()["ready"] is True
+        assert call(mcp, "crm_outreach_sequences_get", {"uid": str(uuid.UUID(int=99)), "actor_uid": "spoof"})["structuredContent"]["code"] == "invalid_arguments"
+        assert http.get("/extensions/outreach-sequences/participants/?status=bogus").status_code == 422
+        old_route = http.post("/extensions/campaigns/tasks/prepare/", json=prepare)
+        new_route = http.post("/extensions/outreach-sequences/tasks/prepare/", json=prepare)
+        assert old_route.status_code == new_route.status_code == 200
+        assert old_route.json() == new_route.json()
         catalogue = {t["name"]: t for t in rpc(mcp, "tools/list")["tools"]}
-        assert catalogue["crm_campaign_tasks_complete"]["inputSchema"]["required"] == [
+        assert not any(name.startswith(("crm_campaign_", "crm_campaigns_")) for name in catalogue)
+        assert catalogue["crm_outreach_sequences_tasks_complete"]["inputSchema"]["required"] == [
             "participant_uid", "step_uid", "expected_version", "task_expected_version", "outcome_key", "evidence", "prepared_with",
         ]
 
@@ -502,7 +523,7 @@ def test_mcp_and_http_share_the_campaign_service(signed_caller):
 def test_reader_without_edit_is_denied_on_every_mutation(signed_caller):
     store = MemoryStore()
     with TestClient(app_for(Policy("crm.read"), store), headers=signed_caller(ACTOR)) as client:
-        assert client.post("/extensions/campaigns/tasks/advance/", json={"participant_uid": str(uuid.UUID(int=77)), "expected_version": 1}).status_code == 403
-        assert client.post("/extensions/campaigns/campaigns/", json={"name": "x", "objective": "# y", "owner_uid": str(ACTOR)}).status_code == 403
-        assert client.get(f"/extensions/campaigns/campaigns/{uuid.UUID(int=99)}/").status_code == 200
+        assert client.post("/extensions/outreach-sequences/tasks/advance/", json={"participant_uid": str(uuid.UUID(int=77)), "expected_version": 1}).status_code == 403
+        assert client.post("/extensions/outreach-sequences/sequences/", json={"name": "x", "objective": "# y", "owner_uid": str(ACTOR)}).status_code == 403
+        assert client.get(f"/extensions/outreach-sequences/sequences/{uuid.UUID(int=99)}/").status_code == 200
     assert not [c for c in store.calls if c[0] != "graph_impact"]

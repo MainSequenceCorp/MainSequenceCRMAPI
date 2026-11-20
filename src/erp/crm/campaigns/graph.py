@@ -34,7 +34,7 @@ def validate_graph(
         diagnostics.append(_diag("entry_missing", "Choose the entry step before activation"))
     elif graph.entry_step_uid not in steps:
         diagnostics.append(
-            _diag("entry_invalid", "The entry step must be an active step of this campaign",
+            _diag("entry_invalid", "The entry step must be an active step of this sequence",
                   step_uid=graph.entry_step_uid)
         )
 

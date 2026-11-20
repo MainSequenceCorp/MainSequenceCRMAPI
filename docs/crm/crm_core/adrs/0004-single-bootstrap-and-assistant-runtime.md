@@ -48,14 +48,14 @@ mount the CRM. `/readiness/` may remain a protected operational diagnostic.
 ### Persisted application configuration
 
 Store the nonsecret deployment configuration in a repository-owned YAML file
-at `config/erp/crm/settings.yaml`, included in the API release artifact. Its initial shape
-is:
+at `config/erp/crm/settings.yaml`, included in the API release artifact. The
+current modules are:
 
 ```yaml
 extensions:
   solution_selling:
     active: true
-  google_workspace:
+  campaigns:
     active: true
 ```
 
@@ -72,13 +72,12 @@ or unknown configuration instead of silently defaulting a misspelled module
 off. Use the same immutable parsed snapshot to mount extension routes and to
 fill `modules` in bootstrap; a file change takes effect after process restart
 or redeployment. The CRM's existing singleton business settings remain in
-their governed MetaTable. Google OAuth client credentials and token-encryption
-secrets remain in Main Sequence Secrets; they are never put in this YAML.
+their governed MetaTable. GoogleConnector owns OAuth credentials and ERP
+Settings controls availability of its integrations.
+[Google Workspace API](../../api/google-workspace.md)
 
-The YAML replaces the two `INCLUDE_*` extension switches as the source of
-truth. Route mounting and bootstrap now read the same parsed snapshot; the
-local launcher, private `.env`, and managed API workflow no longer set those
-flags. There is no environment-variable activation override.
+Route mounting and bootstrap read the same parsed YAML snapshot for the
+CRM-owned modules.
 
 If the CRM is not ready, bootstrap returns HTTP 503 with the existing safe
 `CRM_NOT_READY` error and a bounded `readiness` object containing the failed or
@@ -110,7 +109,7 @@ deployed API revision has not yet been verified against it.
   "default_pipeline_uid": "<pipeline-uuid>",
   "limits": {"...": "existing limits fields"},
   "readiness": {"status": "ready", "schema_version": "<active schema>", "application_version": "0.1.0", "checks": []},
-  "modules": {"solution_selling": true, "google_workspace": true},
+  "modules": {"solution_selling": true, "campaigns": true},
   "assistant": {"enabled": true, "runtime": {"mode": "local", "base_path": "/tau"}, "agent_uid": null, "environment_uid": null, "display_name": "CRM assistant"}
 }
 ```
@@ -121,12 +120,10 @@ models for those fields. `current_user.display_name` names the human; it is
 not the assistant's display name.
 
 The API process that mounts an extension also reports its activation in
-`modules`. `modules.solution_selling` and `modules.google_workspace` come
-from the corresponding `extensions.<name>.active` values in the parsed YAML.
-The frontend receives those booleans from bootstrap and still applies the
-user's capabilities to actions and navigation. An active extension does not
-authorize the user or prove that Google OAuth credentials and consent are
-complete. The frontend does not read the YAML directly.
+`modules`. `modules.solution_selling` and `modules.campaigns` come from the
+corresponding `extensions.<name>.active` values in the parsed YAML. The
+frontend uses those booleans and the user's capabilities for actions and
+navigation. ERP Settings supplies GoogleConnector availability separately.
 
 ### Assistant variants
 

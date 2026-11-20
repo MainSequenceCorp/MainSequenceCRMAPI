@@ -1,10 +1,10 @@
 # Mounted route index
 
 This is the exact core method/path inventory exposed by `api.erp.crm.main:app`.
-All three optional extensions are active in `config/erp/crm/settings.yaml`; their additional
-routes are described in [Solution Selling](solution-selling.md),
-[Google Workspace](google-workspace.md) and [Campaigns](campaigns.md). All optional extension API routes use
-`/extensions/<module>/`; core CRM routes use `/api/crm/v1/`. The grouped pages explain payloads and behavior. Updating a mounted route also
+[Solution Selling](solution-selling.md) and [Outreach Sequences](outreach-sequences.md) are active
+in `config/erp/crm/settings.yaml`. ERP Settings controls access to the
+[GoogleConnector workflows](google-workspace.md). The grouped pages explain
+payloads and behavior. Updating a mounted route also
 requires updating this index; `tests/erp/crm/documentation/test_documentation.py` compares it with
 FastAPI's generated OpenAPI paths.
 
@@ -108,16 +108,6 @@ FastAPI's generated OpenAPI paths.
 
 | Method | Path | Reference |
 | --- | --- | --- |
-| `POST` | `/extensions/google/oauth/start/` | [Google Workspace](google-workspace.md) |
-| `GET` | `/extensions/google/oauth/callback/` | [Google Workspace](google-workspace.md) |
-| `GET` | `/extensions/google/oauth/done/` | [Google Workspace](google-workspace.md) |
-| `GET` | `/extensions/google/oauth/attempts/{uid}/` | [Google Workspace](google-workspace.md) |
-| `POST` | `/extensions/google/oauth/complete/` | [Google Workspace](google-workspace.md) |
-| `GET` | `/extensions/google/connections/` | [Google Workspace](google-workspace.md) |
-| `POST` | `/extensions/google/connections/{uid}/disconnect/` | [Google Workspace](google-workspace.md) |
-| `GET` | `/extensions/google/calendars/` | [Google Workspace](google-workspace.md) |
-| `POST` | `/extensions/google/preview/` | [Google Workspace](google-workspace.md) |
-| `POST` | `/extensions/google/imports/` | [Google Workspace](google-workspace.md) |
 | `GET` | `/extensions/solution-selling/assessments/` | [Solution Selling](solution-selling.md) |
 | `POST` | `/extensions/solution-selling/assessments/` | [Solution Selling](solution-selling.md) |
 | `GET` | `/extensions/solution-selling/assessments/{uid}/` | [Solution Selling](solution-selling.md) |
@@ -146,29 +136,29 @@ FastAPI's generated OpenAPI paths.
 
 | `POST` | `/extensions/solution-selling/context/` | [Solution Selling](solution-selling.md) |
 | `POST` | `/extensions/solution-selling/diagnoses/prepare/` | [Solution Selling](solution-selling.md) |
-| `GET` | `/extensions/campaigns/campaigns/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/campaigns/` | [Campaigns](campaigns.md) |
-| `GET` | `/extensions/campaigns/campaigns/{uid}/` | [Campaigns](campaigns.md) |
-| `PATCH` | `/extensions/campaigns/campaigns/{uid}/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/campaigns/{uid}/archive/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/campaigns/{uid}/restore/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/campaigns/{uid}/graph/validate/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/campaigns/{uid}/graph/` | [Campaigns](campaigns.md) |
-| `GET` | `/extensions/campaigns/prompts/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/prompts/` | [Campaigns](campaigns.md) |
-| `GET` | `/extensions/campaigns/prompts/{uid}/` | [Campaigns](campaigns.md) |
-| `PATCH` | `/extensions/campaigns/prompts/{uid}/` | [Campaigns](campaigns.md) |
-| `GET` | `/extensions/campaigns/participants/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/participants/` | [Campaigns](campaigns.md) |
-| `GET` | `/extensions/campaigns/participants/{uid}/` | [Campaigns](campaigns.md) |
-| `PATCH` | `/extensions/campaigns/participants/{uid}/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/tasks/prepare/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/tasks/advance/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/tasks/complete/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/tasks/wait/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/tasks/block/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/tasks/report/` | [Campaigns](campaigns.md) |
-| `POST` | `/extensions/campaigns/tasks/reconcile/` | [Campaigns](campaigns.md) |
+| `GET` | `/extensions/outreach-sequences/sequences/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/sequences/` | [Outreach Sequences](outreach-sequences.md) |
+| `GET` | `/extensions/outreach-sequences/sequences/{uid}/` | [Outreach Sequences](outreach-sequences.md) |
+| `PATCH` | `/extensions/outreach-sequences/sequences/{uid}/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/sequences/{uid}/archive/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/sequences/{uid}/restore/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/sequences/{uid}/graph/validate/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/sequences/{uid}/graph/` | [Outreach Sequences](outreach-sequences.md) |
+| `GET` | `/extensions/outreach-sequences/prompts/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/prompts/` | [Outreach Sequences](outreach-sequences.md) |
+| `GET` | `/extensions/outreach-sequences/prompts/{uid}/` | [Outreach Sequences](outreach-sequences.md) |
+| `PATCH` | `/extensions/outreach-sequences/prompts/{uid}/` | [Outreach Sequences](outreach-sequences.md) |
+| `GET` | `/extensions/outreach-sequences/participants/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/participants/` | [Outreach Sequences](outreach-sequences.md) |
+| `GET` | `/extensions/outreach-sequences/participants/{uid}/` | [Outreach Sequences](outreach-sequences.md) |
+| `PATCH` | `/extensions/outreach-sequences/participants/{uid}/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/tasks/prepare/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/tasks/advance/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/tasks/complete/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/tasks/wait/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/tasks/block/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/tasks/report/` | [Outreach Sequences](outreach-sequences.md) |
+| `POST` | `/extensions/outreach-sequences/tasks/reconcile/` | [Outreach Sequences](outreach-sequences.md) |
 
 Export creation and download routes are not mounted and therefore do not
 appear here.
@@ -185,3 +175,18 @@ appear here.
 | `POST` | `/extensions/google/email-threads/{uid}/selection/` | [Emails](emails.md) |
 | `POST` | `/extensions/google/email-threads/{uid}/sync/` | [Emails](emails.md) |
 | `POST` | `/extensions/google/email-sync/` | [Emails](emails.md) |
+
+## Preserved Google Workspace endpoints
+
+| Method | Path | Handler |
+| --- | --- | --- |
+| `POST` | `/extensions/google/oauth/start/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/google/oauth/callback/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/google/oauth/done/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/google/oauth/attempts/{uid}/` | [Google Workspace](google-workspace.md) |
+| `POST` | `/extensions/google/oauth/complete/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/google/connections/` | [Google Workspace](google-workspace.md) |
+| `POST` | `/extensions/google/connections/{uid}/disconnect/` | [Google Workspace](google-workspace.md) |
+| `GET` | `/extensions/google/calendars/` | [Google Workspace](google-workspace.md) |
+| `POST` | `/extensions/google/preview/` | [Google Workspace](google-workspace.md) |
+| `POST` | `/extensions/google/imports/` | [Google Workspace](google-workspace.md) |

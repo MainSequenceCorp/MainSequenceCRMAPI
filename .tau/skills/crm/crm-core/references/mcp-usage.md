@@ -11,7 +11,7 @@ shared reference from `crm-core`; the other skills link to that resource.
   bounds. With direct CRM tools, call those tools; with a generic CRM bridge,
   discover with `crm__list_tools` and invoke through `crm__call_tool`. Bridge
   wrappers are not business tools in the allocation.
-- Solution Selling and Campaigns tools are advertised only when their module is
+- Solution Selling and Outreach Sequences tools are advertised only when their module is
   active. A skill's presence does not make its tools available. Explain a missing
   operation instead of substituting repository edits or undocumented API calls.
 - Search with the tool's supported filters and bounded paging, then read the
@@ -38,7 +38,7 @@ identity after a denied human request.
 | Ordinary list/get, stages/board, principals/settings reads, context, diagnosis preparation, prompter rendering | `crm.read` |
 | Ordinary record creation | `crm.create` |
 | Record updates, Task complete/reopen, Deal move | `crm.edit` |
-| Campaign graph saves, participant changes, campaign task commands | `crm.edit` (advance also `crm.create`; cancelling or withdrawing also `crm.archive`) |
+| Outreach Sequence graph saves, participant changes, sequence task commands | `crm.edit` (advance also `crm.create`; cancelling or withdrawing also `crm.archive`) |
 | Affiliation creation/update and primary Company transition | `crm.edit` |
 | Contact merge preview, although read-only | `crm.merge` |
 | Settings update | `crm.configure` |
@@ -55,7 +55,7 @@ The actual service response decides access; skill instructions grant none.
   research or a suggestion does not imply permission to save related records
   or send a message. A prospecting outreach request includes required prompter
   creation when none is indicated, as defined by
-  [prospecting](skill://solution-selling/crm-prospecting/SKILL.md). Rendering
+  [prospecting](skill://crm/solution-selling/crm-prospecting/SKILL.md). Rendering
   still does not authorize a Lead, Interaction, Task or delivery as a side effect.
 - Ordinary updates use `uid` and `payload: {expected_version, changes}`.
   Obtain a current version first. Send only intended changes: omission retains

@@ -1,10 +1,11 @@
-"""Thin HTTP adapters for the optional Campaigns module (`/extensions/campaigns/`)."""
+"""Thin HTTP adapters for the Outreach Sequences extension."""
 
 from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, FastAPI, Query, Request
+from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
 from src.erp.crm.campaigns.models import (
@@ -28,7 +29,24 @@ from src.erp.crm.models.common import VersionCommand
 
 from .service_adapter import invoke, service_for
 
-router = APIRouter(prefix="/extensions/campaigns")
+router = APIRouter(prefix="/extensions/outreach-sequences", tags=["Outreach Sequences"])
+
+
+def mount_campaign_compatibility(application: FastAPI):
+    """Serve the previous site's routes until it moves to Outreach Sequences."""
+    for route in router.routes:
+        if isinstance(route, APIRoute):
+            path = route.path.removeprefix(router.prefix)
+            if path.startswith("/sequences/"):
+                path = "/campaigns/" + path.removeprefix("/sequences/")
+            application.add_api_route(
+                "/extensions/campaigns" + path,
+                route.endpoint,
+                methods=route.methods,
+                status_code=route.status_code,
+                include_in_schema=False,
+            )
+
 
 LIST_KEYS = {"page_index", "page_size", "search"}
 
@@ -49,43 +67,43 @@ def _call(method: str, request: Request, *args, **kwargs):
     return invoke(lambda: getattr(service_for(request).campaigns, method)(*args, **kwargs))
 
 
-@router.get("/campaigns/")
-def list_campaigns(request: Request, page_index: int = Query(0, ge=0), page_size: int = Query(25, ge=1, le=100),
+@router.get("/sequences/")
+def list_sequences(request: Request, page_index: int = Query(0, ge=0), page_size: int = Query(25, ge=1, le=100),
                    search: str | None = Query(None, max_length=255)):
     return _list("list_campaigns", request, page_index, page_size, search)
 
 
-@router.post("/campaigns/", status_code=201)
-def create_campaign(request: Request, payload: CampaignCreate):
+@router.post("/sequences/", status_code=201)
+def create_sequence(request: Request, payload: CampaignCreate):
     return _call("create_campaign", request, payload)
 
 
-@router.get("/campaigns/{uid}/")
-def get_campaign(uid: uuid.UUID, request: Request):
+@router.get("/sequences/{uid}/")
+def get_sequence(uid: uuid.UUID, request: Request):
     return _call("get_campaign", request, uid)
 
 
-@router.patch("/campaigns/{uid}/")
-def update_campaign(uid: uuid.UUID, request: Request, payload: CampaignPatch):
+@router.patch("/sequences/{uid}/")
+def update_sequence(uid: uuid.UUID, request: Request, payload: CampaignPatch):
     return _call("update_campaign", request, uid, payload)
 
 
-@router.post("/campaigns/{uid}/archive/")
-def archive_campaign(uid: uuid.UUID, request: Request, payload: VersionCommand):
+@router.post("/sequences/{uid}/archive/")
+def archive_sequence(uid: uuid.UUID, request: Request, payload: VersionCommand):
     return _call("archive_campaign", request, uid, payload.expected_version, archived=True)
 
 
-@router.post("/campaigns/{uid}/restore/")
-def restore_campaign(uid: uuid.UUID, request: Request, payload: VersionCommand):
+@router.post("/sequences/{uid}/restore/")
+def restore_sequence(uid: uuid.UUID, request: Request, payload: VersionCommand):
     return _call("archive_campaign", request, uid, payload.expected_version, archived=False)
 
 
-@router.post("/campaigns/{uid}/graph/validate/")
+@router.post("/sequences/{uid}/graph/validate/")
 def validate_graph(uid: uuid.UUID, request: Request, payload: GraphValidateRequest):
     return _call("validate_candidate_graph", request, uid, payload)
 
 
-@router.post("/campaigns/{uid}/graph/")
+@router.post("/sequences/{uid}/graph/")
 def update_graph(uid: uuid.UUID, request: Request, payload: GraphUpdate):
     return _call("update_graph", request, uid, payload)
 

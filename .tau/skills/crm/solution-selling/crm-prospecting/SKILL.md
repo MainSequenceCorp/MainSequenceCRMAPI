@@ -5,11 +5,11 @@ description: Resolve Companies before creating prospecting Contacts, then run So
 
 # Prospecting outreach, profiles and Leads
 
-Read [shared MCP guidance](skill://crm-core/references/mcp-usage.md). These tools require
+Read [shared MCP guidance](skill://crm/crm-core/references/mcp-usage.md). These tools require
 the Solution Selling module to be advertised. Use
-[CRM core](skill://crm-core/SKILL.md) for Contacts, Interactions, owners and Tasks,
-[prompters](skill://solution-selling/crm-prompters/SKILL.md) for outreach drafts and
-[discovery](skill://solution-selling/crm-discovery/SKILL.md) for diagnosis preparation.
+[CRM core](skill://crm/crm-core/SKILL.md) for Contacts, Interactions, owners and Tasks,
+[prompters](skill://crm/solution-selling/crm-prompters/SKILL.md) for outreach drafts and
+[discovery](skill://crm/solution-selling/crm-discovery/SKILL.md) for diagnosis preparation.
 
 ## Company before prospecting Contact
 
@@ -123,7 +123,7 @@ for a message already sent.
    justify a requested `qualified`, `nurture` or `disqualified` update; it does
    not create a Deal. Route actual discovery evidence to the discovery skill
    and an explicitly requested opportunity to
-   [Deals](skill://crm-deals/SKILL.md).
+   [Deals](skill://crm/crm-deals/SKILL.md).
 
 At completion, distinguish the prompter saved, draft rendered, outreach reported
 or verified, Interaction saved, Lead state and linked Task. For a draft-only

@@ -50,13 +50,17 @@ from src.erp.crm.emails.models import (
     ManualEmailCreate,
     SyncChoice,
 )
-from src.erp.crm.google_workspace.config import google_workspace_enabled
-from src.erp.crm.models.affiliations import AffiliationCreate, AffiliationPatch, AffiliationTransition
+from src.erp.crm.models.affiliations import (
+    AffiliationCreate,
+    AffiliationPatch,
+    AffiliationTransition,
+)
 from src.erp.crm.models.bootstrap import SettingsPatch
 from src.erp.crm.models.deals import MoveDeal
 from src.erp.crm.models.merge import MergePreviewRequest
 from src.erp.crm.models.queries import FILTER_MODELS, QueryScope
 from src.erp.crm.models.record_filters import RecordFilters
+from src.erp.crm.google_workspace.config import google_workspace_enabled
 from src.erp.crm.platform.diagnostics import observe_tool, record_exception
 from src.erp.crm.platform.runtime import BootstrapPort
 from src.erp.crm.repositories.errors import ResourceConflict, ResourceNotFound
@@ -76,6 +80,7 @@ from src.erp.crm.solution_selling.models import (
     PrompterValidateRequest,
     SolutionSellingContextRequest,
 )
+from src.erp.user_preferences.errors import UserPreferencesError
 
 
 @dataclass(frozen=True)
@@ -223,6 +228,9 @@ def _tool(
             return tool_result("not_found", message="CRM record not found")
         except ResourceConflict:
             return tool_result("conflict", message="CRM state changed; reread before retrying")
+        except UserPreferencesError as exc:
+            status = {403: "forbidden", 409: "conflict"}.get(exc.status, "unavailable")
+            return tool_result(status, message=exc.message)
         except Exception as exc:
             record_exception(exc)
             return tool_result("internal_error", message="CRM operation failed")
@@ -594,15 +602,16 @@ def build_crm_tools(runtime_provider: RuntimeProvider) -> tuple[CRMTool, ...]:
 
 
 def _add_campaign_tools(add) -> None:
-    """Campaigns module tools: definitions, step prompts, enrollment and progression."""
+    """Outreach Sequences tools for definitions, prompts, enrollment and progression."""
 
     def resource_tools(slug, label, filters_model, create_model_type, patch_model_type, *, methods, create_description, update_description):
+        schema_name = "".join(word.capitalize() for word in slug.split("_"))
         list_args = create_model(
-            f"{slug.title()}ListToolArguments", __base__=_RecordList,
+            f"{schema_name}ListToolArguments", __base__=_RecordList,
             filters=(filters_model, Field(default_factory=filters_model)),
         )
-        create_args = create_model(f"{slug.title()}CreateToolArguments", __base__=_Arguments, payload=(create_model_type, ...))
-        update_args = create_model(f"{slug.title()}UpdateToolArguments", __base__=_UID, payload=(patch_model_type, ...))
+        create_args = create_model(f"{schema_name}CreateToolArguments", __base__=_Arguments, payload=(create_model_type, ...))
+        update_args = create_model(f"{schema_name}UpdateToolArguments", __base__=_UID, payload=(patch_model_type, ...))
         prefix = f"crm_{slug}"
         list_method, get_method, create_method, update_method = methods
         add(f"{prefix}_list", f"List {label} with bounded paging, search and filters.", list_args,
@@ -615,61 +624,61 @@ def _add_campaign_tools(add) -> None:
             lambda service, args, m=update_method: getattr(service.campaigns, m)(args.uid, args.payload), mutation=True)
 
     resource_tools(
-        "campaigns", "campaigns", CampaignFilters, CampaignCreate, CampaignPatch,
+        "outreach_sequences", "outreach sequences", CampaignFilters, CampaignCreate, CampaignPatch,
         methods=("list_campaigns", "get_campaign", "create_campaign", "update_campaign"),
-        create_description="Create a draft campaign with a name, Markdown objective, owner and bounded context. "
-                           "Steps and connections are added with crm_campaigns_graph_update.",
-        update_description="Edit campaign fields or change its lifecycle (draft→active, active↔paused, →completed) "
+        create_description="Create a draft outreach sequence with a name, Markdown objective, owner and bounded context. "
+                           "Add steps and connections with crm_outreach_sequences_graph_update.",
+        update_description="Edit a sequence or change its lifecycle (draft→active, active↔paused, →completed) "
                            "using the expected version. Activation validates the live graph.",
     )
     resource_tools(
-        "campaign_prompts", "campaign step prompts", StepPromptFilters, StepPromptCreate, StepPromptPatch,
+        "outreach_sequences_prompts", "sequence step prompts", StepPromptFilters, StepPromptCreate, StepPromptPatch,
         methods=("list_step_prompts", "get_step_prompt", "create_step_prompt", "update_step_prompt"),
-        create_description="Create a campaign step prompt (an Agent Prompt with declared inputs and result fields), "
+        create_description="Create a sequence step prompt (an Agent Prompt with declared inputs and result fields), "
                            "or specialize an existing Agent Prompt by prompt_uid and expected_version.",
         update_description="Edit a step prompt's document, inputs or result fields using the shared Prompt version. "
                            "Changed content blocks open work and flags compared assignments.",
     )
     resource_tools(
-        "campaign_participants", "campaign participants", ParticipantFilters, ParticipantCreate, ParticipantPatch,
+        "outreach_sequences_participants", "sequence participants", ParticipantFilters, ParticipantCreate, ParticipantPatch,
         methods=("list_participants", "get_participant", "create_participant", "update_participant"),
-        create_description="Enroll an existing Contact in a campaign once. Enrollment schedules the entry step; "
-                           "it never creates or sends anything by itself.",
+        create_description="Enroll an existing Contact in an outreach sequence once. Enrollment schedules the entry step "
+                           "without creating a Task or sending a message.",
         update_description="Change participant context, pause/resume, withdraw, or explicitly reroute next_step_uid "
                            "after a live edit, using the expected version. Progress fields are service-owned.",
     )
-    validate_args = create_model("CampaignGraphValidateToolArguments", __base__=_UID, payload=(GraphValidateRequest, ...))
-    add("crm_campaigns_graph_validate",
+    validate_args = create_model("OutreachSequenceGraphValidateToolArguments", __base__=_UID, payload=(GraphValidateRequest, ...))
+    add("crm_outreach_sequences_graph_validate",
         "Read-only validation of a complete candidate graph (steps, connections, entry) with the impact on "
         "current participants and open Tasks. Nothing is saved.",
         validate_args, lambda service, args: service.campaigns.validate_candidate_graph(args.uid, args.payload))
-    graph_args = create_model("CampaignGraphUpdateToolArguments", __base__=_UID, payload=(GraphUpdate, ...))
-    add("crm_campaigns_graph_update",
-        "Atomically save the complete graph against the campaign version: add/edit/retire steps and replace "
+    graph_args = create_model("OutreachSequenceGraphUpdateToolArguments", __base__=_UID, payload=(GraphUpdate, ...))
+    add("crm_outreach_sequences_graph_update",
+        "Atomically save the complete graph against the sequence version: add/edit/retire steps and replace "
         "connections. affected_open_work chooses block (default) or cancel for retired steps' open Tasks.",
         graph_args, lambda service, args: service.campaigns.update_graph(args.uid, args.payload), mutation=True)
-    add("crm_campaign_tasks_prepare",
+    add("crm_outreach_sequences_tasks_prepare",
         "Read-only briefing for an existing participant Task: current objective, step, assigned prompt variant, "
         "resolved inputs, allowed outcomes, transitions and version provenance. Never rerandomizes or writes.",
         ProgressRef, lambda service, args: service.campaigns.prepare(args))
-    add("crm_campaign_tasks_advance",
+    add("crm_outreach_sequences_tasks_advance",
         "Create the eligible next Task and its prompt assignment once, or return the existing instance. "
         "Does not execute the work or send anything.",
         AdvanceCommand, lambda service, args: service.campaigns.advance(args), mutation=True)
-    add("crm_campaign_tasks_complete",
+    add("crm_outreach_sequences_tasks_complete",
         "Submit an allowed outcome, typed result and evidence with the briefing's prepared_with provenance. "
         "Completes the Task and routes atomically; a stale briefing records the facts and blocks instead.",
         CompleteCommand, lambda service, args: service.campaigns.complete(args), mutation=True)
-    add("crm_campaign_tasks_wait",
-        "Mark an open campaign Task as waiting until wake_at, optionally recording evidence.",
+    add("crm_outreach_sequences_tasks_wait",
+        "Mark an open sequence Task as waiting until wake_at, optionally recording evidence.",
         WaitCommand, lambda service, args: service.campaigns.wait(args), mutation=True)
-    add("crm_campaign_tasks_block",
-        "Mark an open campaign Task as blocked with an actionable reason, optionally recording evidence.",
+    add("crm_outreach_sequences_tasks_block",
+        "Mark an open sequence Task as blocked with an actionable reason, optionally recording evidence.",
         BlockCommand, lambda service, args: service.campaigns.block(args), mutation=True)
-    add("crm_campaign_tasks_report",
-        "Record observed facts or partial results on an open campaign Task without completing or routing it.",
+    add("crm_outreach_sequences_tasks_report",
+        "Record observed facts or partial results on an open sequence Task without completing or routing it.",
         ReportCommand, lambda service, args: service.campaigns.report(args), mutation=True)
-    add("crm_campaign_tasks_reconcile",
+    add("crm_outreach_sequences_tasks_reconcile",
         "Resolve blocked work explicitly: resume (accept the stored result against the current graph), "
         "reopen (refresh the briefing), or cancel (archive the Task and reroute or finish the participant).",
         ReconcileCommand, lambda service, args: service.campaigns.reconcile(args), mutation=True)

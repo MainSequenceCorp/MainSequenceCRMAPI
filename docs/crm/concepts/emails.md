@@ -1,8 +1,7 @@
 # Selected email history
 
-**Status: implemented and deployed. Saved-email reads and the Lead import form
-were verified live; actual Google import and a second-user session remain
-unverified.** [ADR 0002](../google_workspace_module/adrs/0002-selected-email-history.md)
+**Status** Email history is deployed. The GoogleConnector provider cutover is
+implemented locally and awaiting hosted verification. [ADR 0002](../google_workspace_module/adrs/0002-selected-email-history.md)
 defines the sharing and selective synchronization policy.
 
 Email history is core CRM data, independent of optional Solution Selling and
@@ -22,9 +21,13 @@ Gmail access is actor-owned. Connecting, search and preview never store messages
 An explicit import saves only the reviewed message IDs and CRM context into shared
 history. New source conversations start with sync off; adding history to an already
 enrolled source does not change its sync choice. Account/message uniqueness prevents duplication across reconnect and retry.
-A separate owner action enrolls one thread for future replies. The server checks
-that selection, account, grant, capabilities and versions for every refresh and
-again at commit. Same-contact threads are not implicitly eligible.
+Connect through **Settings → Connectors → Gmail**. GoogleConnector owns the
+private Gmail grant, source reads, and review tokens. CRM validates the
+business context, publishes the selected copies, and owns enrollment and
+the saved history.
+A separate owner action enrolls one thread for future replies. The connector confirms that selection with CRM before reading an eligible
+message body. CRM checks the account, grant generation, capabilities and
+selection version in the write. Same-contact threads are not implicitly eligible.
 
 Synchronization uses exact Gmail thread reads and persisted message identities,
 not mailbox-wide history. The reader checks its selected thread every minute while

@@ -1,4 +1,4 @@
-"""Local-only MCP transport; CRM schemas and business rules live in the API."""
+"""Local-only MCP transport; ERP schemas and business rules live in the API."""
 
 import json
 import os
@@ -48,7 +48,7 @@ def _http_client():
 
 @asynccontextmanager
 async def _session(endpoint):
-    # No credentials, identities or sessions are cached. The loopback CRM
+    # No credentials, identities or sessions are cached. The loopback ERP
     # launcher supplies and verifies its own saved local SDK sign-in.
     async with _http_client() as http:
         async with streamable_http_client(endpoint, http_client=http) as (read, write):
@@ -60,7 +60,7 @@ async def _session(endpoint):
 def _result(data):
     text = json.dumps(data, ensure_ascii=False)
     if len(text) > MAX_RESULT_CHARS:
-        data = {"code": "result_too_large", "message": "Narrow the CRM query"}
+        data = {"code": "result_too_large", "message": "Narrow the ERP query"}
         text = json.dumps(data)
     return AgentToolResult(content=[TextContent(text=text)], details=data)
 
@@ -69,7 +69,7 @@ def local_mcp_tools() -> tuple[AgentTool, ...]:
     if os.environ.get("TAU_LOCAL_MODE", "").lower() not in {"true", "1", "yes", "on"}:
         return ()
     if os.environ.get("APP_NAME") or os.environ.get("MAINSEQUENCE_CALLER_AUTH_MODE") == "assertion":
-        raise ValueError("The local CRM bridge cannot run in a hosted runtime")
+        raise ValueError("The local ERP bridge cannot run in a hosted runtime")
     endpoint = _endpoint()
 
     def tool(name, model, *, call):
@@ -81,6 +81,7 @@ def local_mcp_tools() -> tuple[AgentTool, ...]:
                 return _result({"code": "invalid_arguments"})
             if signal is not None and signal.is_cancelled():
                 return _result({"code": "cancelled", "message": "The call was not started"})
+            domain = "CRM" if call and parsed.tool.startswith("crm_") else "ERP"
             sent = False
             try:
                 with anyio.fail_after(60):
@@ -99,14 +100,14 @@ def local_mcp_tools() -> tuple[AgentTool, ...]:
                 return _result({
                     "code": "outcome_unknown" if sent else "unavailable",
                     "message": (
-                        "Read current CRM state before retrying; the call may have completed"
-                        if sent else "The local CRM MCP endpoint is unavailable"
+                        f"Read current {domain} state before retrying. The call may have completed."
+                        if sent else "The local ERP MCP endpoint is unavailable"
                     ),
                 })
             if signal is not None and signal.is_cancelled():
                 return _result({
                     "code": "outcome_unknown" if sent else "cancelled",
-                    "message": "Read current CRM state before any retry",
+                    "message": f"Read current {domain} state before any retry",
                 })
             return _result(data)
 
@@ -114,8 +115,8 @@ def local_mcp_tools() -> tuple[AgentTool, ...]:
             name=name,
             label=name,
             description=(
-                "Call a CRM MCP tool by name; use crm__list_tools for its input schema."
-                if call else "List the CRM application's MCP tools and input schemas."
+                "Call an ERP MCP tool by name. Use erp_tools_describe for a bounded input schema."
+                if call else "List the ERP application's full MCP catalogue and input schemas."
             ),
             parameters=model.model_json_schema(),
             execute_fn=execute,

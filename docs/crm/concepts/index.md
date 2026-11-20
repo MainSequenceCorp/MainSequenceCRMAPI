@@ -4,6 +4,11 @@ The CRM tracks people, organizations, opportunities, follow-up work, and their
 history in the CRM application. Platform identity and policy govern access;
 the application does not define a workspace or tenant record.
 
+An ERP administrator can deactivate CRM for an Environment. This closes
+interactive CRM access and preserves its records. Base continues to synchronize
+the compatibility fields of already-adopted identities through its existing
+integrity contract.
+
 | Concept | Relationship | Details |
 | --- | --- | --- |
 | [Contact](contacts.md) | May have multiple dated company affiliations; may have tags, tasks, notes, and deals | A person with names and/or email methods |
@@ -22,7 +27,7 @@ adds prospecting leads and profiles, Deal assessments, Interaction diagnoses,
 and reusable prompters. It extends rather than replaces Contact, Company,
 Deal, Task, or Interaction.
 
-The optional [Campaigns module](campaigns.md) defines a live DAG of task
+The optional [Outreach Sequences extension](outreach-sequences.md) defines a live DAG of task
 definitions, each accompanied by a specialized Agent Prompt, and tracks
 existing CRM Task instances for each enrolled Contact, with stable per-Contact
 prompt assignments and descriptive A/B comparisons.
@@ -33,11 +38,15 @@ character limits. Its kind is an open purpose label. Rendering personalizes
 both parts from explicitly selected records; preview validation reports excess
 characters without truncating, saving or sending the draft.
 
-Optional modules expose their API routes below `/extensions/<module>/` and
-mount only when enabled by the API process. Google Workspace uses
-`/extensions/google/`; Solution Selling uses `/extensions/solution-selling/`;
-Campaigns uses `/extensions/campaigns/`.
-The general Interaction model stays in the core CRM API.
+Solution Selling and Campaigns expose their optional CRM extension routes
+below `/extensions/`. The general Interaction model belongs to the core CRM
+API.
+
+GoogleConnector supplies OAuth and Google reads for the optional Contacts,
+Gmail and Calendar workflows in ERP Settings. CRM owns reviewed records,
+publication, source links and the transaction fence. Disconnect closes the
+grant for future writes. Saved records and links remain available under CRM
+permissions. [Google Workspace API](../api/google-workspace.md)
 
 Records have stable UUIDs and relationships to other CRM records. Versions protect edits from
 overwriting newer data. Archive is a marker, not a general permanent delete.

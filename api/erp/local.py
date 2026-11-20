@@ -22,4 +22,7 @@ def create_app() -> FastAPI:
     with _public_ingress(_anonymous_routes()):
         application = create_erp_app(local=True)
     install_local_identity(application, shared_erp=True)
+    application.state.erp_module_apps["user_preferences"].state.crm_local_tau_origin = (
+        application.state.crm_local_tau_origin
+    )
     return application

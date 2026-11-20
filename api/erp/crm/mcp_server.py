@@ -93,6 +93,37 @@ def _require_hosted_person(request) -> str:
     return "direct_human"
 
 
+def crm_runtime_for(request: Request, *, verified_mode: str | None = None) -> CRMToolRuntime:
+    with observe_stage("identity"):
+        identity_mode = "local"
+        if request.app.state.mainsequence_request_identity["mode"] != "local":
+            identity_mode = verified_mode or _require_hosted_person(request)
+        try:
+            context = context_for(request)
+        except HTTPException as exc:
+            if exc.status_code in {401, 403}:
+                _log_denial(request, identity_mode=identity_mode, reason="crm_identity_rejected")
+                raise AccessDenied("CRM identity required") from exc
+            raise ServiceUnavailable("CRM policy or directory unavailable") from exc
+
+    def report_denial(error: AccessDenied) -> None:
+        required_capability = _required_capability(error)
+        _log_denial(
+            request,
+            identity_mode=identity_mode,
+            reason="missing_capability" if required_capability else "access_denied",
+            required_capability=required_capability,
+        )
+
+    return CRMToolRuntime(
+        context,
+        resources=request_port(request, "crm_resources"),
+        records=request_port(request, "crm_record_store"),
+        bootstrap=request_port(request, "crm_bootstrap"),
+        denial_reporter=report_denial,
+        campaign_store=request_port(request, "crm_campaign_store"),
+    )
+
 def install_crm_mcp(application: FastAPI) -> None:
     active_request: contextvars.ContextVar[Request | None] = contextvars.ContextVar(
         "crm_mcp_request", default=None
@@ -102,35 +133,7 @@ def install_crm_mcp(application: FastAPI) -> None:
         request = active_request.get()
         if request is None:
             raise ServiceUnavailable("Missing HTTP request context")
-        with observe_stage("identity"):
-            identity_mode = "local"
-            if application.state.mainsequence_request_identity["mode"] != "local":
-                identity_mode = _require_hosted_person(request)
-            try:
-                context = context_for(request)
-            except HTTPException as exc:
-                if exc.status_code in {401, 403}:
-                    _log_denial(request, identity_mode=identity_mode, reason="crm_identity_rejected")
-                    raise AccessDenied("CRM identity required") from exc
-                raise ServiceUnavailable("CRM policy or directory unavailable") from exc
-
-        def report_denial(error: AccessDenied) -> None:
-            required_capability = _required_capability(error)
-            _log_denial(
-                request,
-                identity_mode=identity_mode,
-                reason="missing_capability" if required_capability else "access_denied",
-                required_capability=required_capability,
-            )
-
-        return CRMToolRuntime(
-            context,
-            resources=request_port(request, "crm_resources"),
-            records=request_port(request, "crm_record_store"),
-            bootstrap=request_port(request, "crm_bootstrap"),
-            denial_reporter=report_denial,
-            campaign_store=request_port(request, "crm_campaign_store"),
-        )
+        return crm_runtime_for(request)
 
     catalogue = {tool.definition.name: tool for tool in build_crm_tools(runtime)}
 
@@ -156,7 +159,7 @@ def install_crm_mcp(application: FastAPI) -> None:
 
     server = CRMMCPServer(
         "crm", version="1",
-        extensions=[skills_extension(".tau/skills/crm")],
+        extensions=[skills_extension(".tau/skills")],
     )
     # install_mcp owns authentication and browser Origin admission for both
     # platform release hosts and local URLs, as with the previous transport.

@@ -24,6 +24,13 @@ class Admission:
         self.used.update(required)
 
 
+def admission_for(scope, *, local, policy, provisioned) -> Admission:
+    from src.erp.modules import REQUIRED_MODULES
+
+    active = (frozenset(policy["active_module_keys"]) | REQUIRED_MODULES) & provisioned
+    return Admission(scope, local, policy["version"], active)
+
+
 admission: ContextVar[Admission | None] = ContextVar("erp_module_admission", default=None)
 
 
@@ -31,6 +38,28 @@ def require_module(module_key: str) -> None:
     current = admission.get()
     if current is not None:
         current.require(module_key)
+
+
+def require_integration(key: str) -> dict:
+    """Require the selected provider workflow inside a version-pinned business request."""
+    current = admission.get()
+    if current is None:
+        raise UserPreferencesError(
+            503, "module_policy_unavailable", "ERP integration admission is unavailable"
+        )
+    from src.erp.user_preferences.admission import require_integration as check_policy
+
+    from src.erp.user_preferences.identity import request_person, require_workflow_admin
+
+    policy = check_policy(current.scope, key, local=current.local)
+    binding = policy["connector_binding"]
+    current.require(binding.workflow.module)
+    require_workflow_admin(binding, lambda: request_person(local=current.local))
+    if policy["version"] != current.version:
+        raise UserPreferencesError(
+            409, "module_policy_changed", "Module policy changed. Reload before retrying."
+        )
+    return policy
 
 
 def module_available(module_key: str) -> bool:

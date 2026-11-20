@@ -1,24 +1,32 @@
-# Campaigns API
+# Outreach Sequences API
 
 These routes mount only when `extensions.campaigns.active: true` in
-`config/erp/crm/settings.yaml`; bootstrap then reports `modules.campaigns: true`. The base
-path is `/extensions/campaigns/`. Disabling the module hides the routes and
+`config/erp/crm/settings.yaml`. Bootstrap reports `modules.outreach_sequences`.
+The base path is `/extensions/outreach-sequences/`. Disabling the extension hides the routes and
 MCP tools and keeps the data. REST, MCP and the designer share
 `src/erp/crm/campaigns/service.py`; every call rechecks the effective person's
 capability and validates the command again at the service boundary. Concepts
-are described in [Campaigns](../concepts/campaigns.md).
+are described in [Outreach Sequences](../concepts/outreach-sequences.md).
+The rename changes public paths, discovery and tool names. Payloads continue to
+use the established wire fields, including `campaign_uid` for enrollment.
+
+During the ERP rollout, `modules.campaigns` mirrors
+`modules.outreach_sequences` for the previous site. The former
+`/extensions/campaigns/` routes, including its `campaigns/` collection,
+use the same handlers with the same permissions and validation. OpenAPI
+advertises the Outreach Sequences paths.
 
 ## Routes
 
 | Method | Relative path | Capability | Result |
 | --- | --- | --- | --- |
-| GET | `campaigns/` | `crm.read` | `{items, pageInfo}` of `CampaignSummary` with `participant_counts` |
-| POST | `campaigns/` | `crm.create` | Draft `Campaign` (201) |
-| GET | `campaigns/{uid}/` | `crm.read` | `Campaign` with `steps`, `transitions`, `validation` and `comparisons` |
-| PATCH | `campaigns/{uid}/` | `crm.edit` | Updated campaign; lifecycle changes validate the graph |
-| POST | `campaigns/{uid}/archive/`, `restore/` | `crm.archive` | Archived or restored campaign |
-| POST | `campaigns/{uid}/graph/validate/` | `crm.read` | Read-only `validation`, `changes` and `impact` for a candidate graph |
-| POST | `campaigns/{uid}/graph/` | `crm.edit` (`crm.archive` with `affected_open_work: cancel`) | Campaign after the atomic graph save |
+| GET | `sequences/` | `crm.read` | `{items, pageInfo}` of `CampaignSummary` with `participant_counts` |
+| POST | `sequences/` | `crm.create` | Draft outreach sequence (201) |
+| GET | `sequences/{uid}/` | `crm.read` | `Campaign` with `steps`, `transitions`, `validation` and `comparisons` |
+| PATCH | `sequences/{uid}/` | `crm.edit` | Updated sequence; lifecycle changes validate the graph |
+| POST | `sequences/{uid}/archive/`, `restore/` | `crm.archive` | Archived or restored sequence |
+| POST | `sequences/{uid}/graph/validate/` | `crm.read` | Read-only `validation`, `changes` and `impact` for a candidate graph |
+| POST | `sequences/{uid}/graph/` | `crm.edit` (`crm.archive` with `affected_open_work: cancel`) | Campaign after the atomic graph save |
 | GET, POST | `prompts/` | `crm.read`, `crm.create` (`crm.edit` when specializing) | Step prompt collection and creation |
 | GET, PATCH | `prompts/{uid}/` | `crm.read`, `crm.edit` | Step prompt with `content_markdown`, `inputs`, `result_fields` |
 | GET, POST | `participants/` | `crm.read`, `crm.create` | Participant collection and enrollment |
@@ -30,14 +38,14 @@ are described in [Campaigns](../concepts/campaigns.md).
 | POST | `tasks/reconcile/` | `crm.edit` (`crm.archive` to cancel) | Participant after reconciliation |
 
 List queries accept `page_index`, `page_size` (1–100) and `search`, plus direct
-filters: campaigns `status`, `owner_uid`, `archived` (`true`, `false` or
+filters: sequences `status`, `owner_uid`, `archived` (`true`, `false` or
 `all`; default active); prompts `archived`; participants `campaign_uid`,
 `contact_uid`, `status` and `attention=true` (blocked instances or a due next
 step). Unknown filters return 422.
 
 ## Payloads
 
-Create a campaign:
+Create an outreach sequence:
 
 ```json
 {"name": "Dubai LinkedIn outreach", "objective": "# Pilots with preferred pricing",
@@ -116,12 +124,12 @@ resolved by reading. Every mutation records an activity event
 ## MCP tools
 
 With the module enabled, the authenticated `/mcp` catalogue advertises 21
-tools through the same service and effective-person checks: `crm_campaigns_
+tools through the same service and effective-person checks: `crm_outreach_sequences_
 {list,get,create,update,graph_validate,graph_update}`,
-`crm_campaign_prompts_{list,get,create,update}`,
-`crm_campaign_participants_{list,get,create,update}` and
-`crm_campaign_tasks_{prepare,advance,complete,wait,block,report,reconcile}`.
+`crm_outreach_sequences_prompts_{list,get,create,update}`,
+`crm_outreach_sequences_participants_{list,get,create,update}` and
+`crm_outreach_sequences_tasks_{prepare,advance,complete,wait,block,report,reconcile}`.
 Reads carry read-only annotations. Schemas mirror the HTTP payloads
 (`payload` wrappers for create/update, `uid` for one record). The
-`crm-campaigns` usage skill in `.tau/skills/crm/` explains the
+`crm-outreach-sequences` usage skill in `.tau/skills/crm/` explains the
 workflows; see [application MCP](mcp.md).

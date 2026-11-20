@@ -10,6 +10,8 @@ from fastapi import HTTPException, Request
 from api.erp.crm.query import QueryError
 from src.erp.base.service import BaseError
 from src.erp.crm.contracts import DomainValidationError
+from src.erp.crm.platform.catalog import configured_registry
+from src.erp.crm.platform.local_runtime import build_local_services
 from src.erp.crm.platform.runtime import authenticated_actor, request_port
 from src.erp.crm.repositories.errors import ResourceConflict, ResourceNotFound
 from src.erp.crm.services.operations import (
@@ -21,6 +23,15 @@ from src.erp.crm.services.operations import (
 from src.erp.crm.services.transfers import ImportInputError
 
 T = TypeVar("T")
+
+
+def bind_local_crm_request(request: Request, signed_user) -> None:
+    registry = configured_registry()
+    policy, directory, bootstrap = build_local_services(signed_user=signed_user, registry=registry)
+    request.state.crm_registry = registry
+    request.state.crm_policy = policy
+    request.state.crm_directory = directory
+    request.state.crm_bootstrap = bootstrap
 
 
 def context_for(request: Request) -> CRMContext:

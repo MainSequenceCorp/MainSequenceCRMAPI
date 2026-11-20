@@ -14,14 +14,19 @@ existing policy and directory adapters, and the default pipeline. It does not
 run a write proof. `/healthz` checks none of these dependencies. Bootstrap
 reuses its request's governed settings and default-pipeline read when building
 the response; it does not repeat that platform operation for each check.
-Bootstrap
-contains safe settings, the current principal, capabilities, the default
-pipeline, limits, `modules.solution_selling`, and `modules.google_workspace`.
-These flags reflect `extensions.solution_selling.active` and
-`extensions.google_workspace.active` in validated `config/erp/crm/settings.yaml`.
-The repository configuration currently sets both to `true`; neither grants
-permission.
+Bootstrap contains safe settings, the current principal, capabilities, the
+default pipeline, limits, `modules.solution_selling`, and `modules.outreach_sequences`.
+These flags reflect the validated `config/erp/crm/settings.yaml`. ERP Settings
+provides independent access status for GoogleConnector integrations.
 Bootstrap contains no application tenant or workspace UID.
+
+In an ERP runtime configured with User Preferences, the server checks
+Environment activation before serving CRM. HTTP `403` with
+`module_disabled` means an administrator has to activate the module. This
+applies to CRM business routes and existing MCP calls. Personal menu
+preferences affect visibility. The caller's usual CRM permissions still
+apply. A write racing an activation change can return `409` with
+`module_policy_changed`. Reload and check the current state before retrying.
 
 [ADR 0004](../crm_core/adrs/0004-single-bootstrap-and-assistant-runtime.md)
 defines the implemented one-request startup contract. Successful bootstrap

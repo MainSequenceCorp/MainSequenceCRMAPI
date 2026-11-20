@@ -80,10 +80,12 @@ contacts, contact-company affiliation periods, and tag links; deals and
 deal-contact links; notes, tasks and activity; redirects; source connections
 and identities; transfer jobs and rows; core Interactions; five optional
 Solution Selling record types; and six Campaigns tables.
-Two private Google OAuth tables store single-use attempts and encrypted
-per-user grant state. They are not exposed as CRM resources. The nonsecret
-Google source account is represented in `SourceConnection` for provenance;
-source identities link reviewed imports to CRM records.
+Revision `0008` and the migration provider retain the historical Google OAuth
+schema for rollback. CRM's runtime catalog has no OAuth table bindings.
+GoogleConnector owns active OAuth attempts and
+encrypted grants. CRM records a credential-free grant fence and source
+account separately from the credential. Source identities link reviewed
+imports to CRM records.
 
 ## Code boundaries
 
@@ -160,13 +162,10 @@ module's full record identifiers fit in the audit stream. It was generated
 from the MetaTable declaration and applied to the same provider on
 2026-09-24.
 
-Revision `0008` declares the backend-only `google_oauth_attempt` and
-`google_oauth_connection` MetaTables. It has been authored locally but has
-been applied to the configured local provider on 2026-09-24. A fresh process
-resolved all 26 active bindings, including both Google tables. The OAuth
-extension is gated by
-`extensions.google_workspace.active` in `config/erp/crm/settings.yaml`; the migration-owned tables remain part
-of the provider catalog even when the routes are off.
+Revision `0008` introduced the former CRM OAuth tables
+`google_oauth_attempt` and `google_oauth_connection`. The verified local
+migration on 2026-09-24 resolved all 26 bindings in a fresh process.
+GoogleConnector now hosts authorization and credential storage.
 
 Revision `0009` adds the non-null JSONB `participants` list to Interactions,
 moves each existing `contact_uid` into one participant entry, checks that the
@@ -243,12 +242,13 @@ to match the validated catalog's DataSource, with a two-row limit and a
 five-second statement timeout. This check works with local SQLite and hosted
 PostgreSQL; it does not make the CRM's PostgreSQL business commands portable.
 
-Hosted CRM migrations run through `.mainsequence/workflows/crm-api.yaml`.
-It declares the CRM API (`crm`), the CRM assistant (`crm-assistant`) and
+Hosted ERP migrations run through `.mainsequence/workflows/crm-api.yaml`.
+It declares the shared ERP API (`crm`), the CRM assistant (`crm-assistant`) and
 the `migrate-crm` Job, which runs `jobs/erp/crm/migrate.py` from the candidate
-image. The Job calls
-`metatables.upgrade_application("src.erp.crm.migrations:migration")` and prints the
-resulting revision and successful catalog reconciliation. It enables INFO
+image. The Job verifies the configured DataSource and calls
+`metatables.upgrade_application()` for each provisioned provider in dependency
+order, including CRM and User Preferences. It prints the resulting revisions
+and catalog reconciliation results. It enables INFO
 logging for `metatables.migrations.runner`, which reports preparation, database
 setup, table checks, Alembic execution, finalization and total duration.
 Measure these separately from platform scheduling and workflow delays.
@@ -267,11 +267,10 @@ execution:
     deploy_assistant: {deploy: crm-assistant, image_from: image_assistant, needs: [deploy_api, image_assistant]}
 ```
 
-The local workflow declaration uses the same `v<major>.<minor>.<patch>-crm`
-tag filter for all three resources. Main Sequence's read-only validation
-accepted the declaration. Applying the policy, publishing a tag, and verifying
-the resulting migration and deployment require the separately approved
-platform rollout. Expansion modules have their own migration Job declarations.
+The workflow candidate uses the same `v<major>.<minor>.<patch>-erp-api`
+tag filter for all three resources. The platform rollout requires explicit
+approval and verification of the new workflow. Each module retains its
+provider, revision history and version table.
 
 At the current head, the Job still checks physical tables and reconciles
 catalog bindings; `migrated=False` only means the revision did not change.
@@ -299,8 +298,8 @@ the isolated local agent gate validate real persisted SQLite settings before
 the hosted migration Job has published new model bindings.
 The workflow retains automatic promotion and its migration-before-deploy graph.
 The former `DISABLED-until-orchestrator-push` transport gate was removed after
-the user confirmed the Production Writer grant was resolved. The current
-pre-push hook runs local API and documentation checks. A tested
+the user confirmed the Production Writer grant was resolved. The pre-push hook
+runs local API and documentation checks. A tested
 provisioning variant with initial automatic deployment disabled was rejected
 by the backend because new services then require pinned image UIDs; that
 invalid variant was not committed or pushed.
@@ -316,11 +315,8 @@ It resolves the active CRM release from the current Git branch, checks the
 Environment and advertised MCP revision, and replaces only the frontend
 workflow's release binding. It rejects the old inactive release and never
 creates a release, grants access or pushes a repository. Validate and build
-that frontend before its push. The helper also reports the callback URI from
-the backend's MCP URL for Google-side registration. Hosted Google OAuth can
-use the launcher's actual `FASTAPI_PUBLIC_BASE_URL` when no explicit
-`GOOGLE_OAUTH_REDIRECT_URI` is set; an explicit URI still takes precedence and
-must be updated if it names a former release.
+that frontend before its push. Configure the Google OAuth callback on the
+GoogleConnector release. [Connector setup](../google_workspace_module/setup.md)
 
 Since 0.1.33, MetaTables uses batched table inventories and physical inspection. Client
 finalization sends at most ten tables per request, starting with the version
@@ -450,3 +446,12 @@ namespace/provider. The identity transfer is an explicit, reconciled operation;
 API startup never performs it. Read the [local adoption procedure](base-adoption.md)
 for writer coordination, activation and recovery. CRM identity columns remain
 an atomic projection for existing consumers. The hosted upgrade is unapproved.
+
+## Google Contacts Connector intake
+
+CRM revision `0017` adds `connector_grant_fence`, a credential-free record
+of the latest open or closed generation for an approved Connector
+installation and connection. Each import checks that generation within its
+governed Contact and provenance transaction. Apply the additive revision to
+verified local SQLite before running the pilot. Production migration remains
+part of CRM's existing migration Job.

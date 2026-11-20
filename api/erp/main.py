@@ -8,7 +8,7 @@ from starlette._utils import get_route_path
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from api.erp.crm.main import install_crm_http
-from api.erp.crm.mcp_server import install_crm_mcp
+from api.erp.mcp.server import install_erp_mcp
 from mainsequence.server.fastapi import install_request_identity
 from src.erp.modules import MODULES
 
@@ -42,7 +42,11 @@ def create_app(*, local: bool = False) -> FastAPI:
     def healthz():
         return {"status": "ok"}
 
-    install_crm_http(application, policy_exempt=tuple(("GET", path) for path in DOC_PATHS))
+    install_crm_http(
+        application,
+        policy_exempt=tuple(("GET", path) for path in DOC_PATHS),
+        policy_exempt_paths=("/mcp",),
+    )
     # Populate the dispatch map before the middleware stack starts. The one
     # SDK installation wraps both the dispatcher and CRM's root routes/MCP.
     surfaces = {}
@@ -57,14 +61,16 @@ def create_app(*, local: bool = False) -> FastAPI:
         key: module.api_prefix for key, module in MODULES.items() if key != "crm"
     }
     module_paths["user_preferences"] = SETTINGS_PREFIX
+    module_apps = {"crm": application}
     for key, prefix in module_paths.items():
         factory = import_module(f"api.erp.{key}.main").create_app
         surface = factory(local=local_mode, install_identity=False)
         surface.state.mainsequence_request_identity = identity
         surface.state.erp_requires_module_policy = True
-        surfaces[prefix] = surface
+        surfaces[prefix] = module_apps[key] = surface
 
-    install_crm_mcp(application)
+    application.state.erp_module_apps = module_apps
+    install_erp_mcp(application, module_apps=module_apps)
 
     def openapi():
         if application.openapi_schema is None:

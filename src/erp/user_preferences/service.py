@@ -4,17 +4,20 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_, insert, select, update
+from sqlalchemy import insert, select, update
 
 from mainsequence.client.exceptions import BadRequestError
 from metatables import MetaTableTransactionGuardError
 from metatables.compiled_sql.v1 import GuardedStatement
 from src.erp.modules import MODULES, REQUIRED_MODULES, WORKFLOWS, active_modules, module_closure
 
-from .admission import lock_admission, read_policy, validate_policy
+from .admission import lock_admission, read_policy
+from .connector_registry import read_bindings
 from .errors import UserPreferencesError
+from .integrations import integration_provisioned, known_binding
 from .metatables import (
     EnvironmentModuleActivation,
+    IntegrationActivationChange,
     ModuleActivationChange,
     ModuleAdmissionLock,
     UserPreference,
@@ -117,34 +120,10 @@ class Service:
         }
 
     def bootstrap(self, provisioned, can_read):
-        activation = EnvironmentModuleActivation.__table__
-        preference = UserPreference.__table__
-        row = self.store.one(
-            select(
-                activation.c.version,
-                activation.c.active_module_keys,
-                preference.c.hidden_module_keys,
-                preference.c.version.label("preference_version"),
-            )
-            .select_from(
-                activation.outerjoin(
-                    preference,
-                    and_(
-                        preference.c.environment_uid == activation.c.environment_uid,
-                        preference.c.person_uid == self.actor,
-                    ),
-                )
-            )
-            .where(activation.c.environment_uid == self.scope)
-        )
-        policy = validate_policy(row)
         return {
-            **self.overview(policy, provisioned, can_read),
+            **self.overview(self.policy(), provisioned, can_read),
             "organization_environment_uid": self.scope,
-            "preferences": {
-                "hidden_module_keys": row["hidden_module_keys"] or [],
-                "version": row["preference_version"] or 0,
-            },
+            "preferences": self.preferences(),
             "can_manage": self.can_manage,
         }
 
@@ -155,6 +134,104 @@ class Service:
             "policy_initialized": policy["version"] > 0,
             "workflows": [asdict(workflow) for workflow in WORKFLOWS],
         }
+
+    def integration_policy(self):
+        policy = read_policy(
+            self.store, self.scope, allow_uninitialized=self.can_manage, include_integrations=True
+        )
+        return policy if policy is not None else {
+            "active_module_keys": [],
+            "active_integration_keys": [],
+            "connector_registry_revision": 0,
+            "version": 0,
+        }
+
+    def _integration_replayed(self, key, payload):
+        audit = IntegrationActivationChange.__table__
+        event = self.store.one(
+            select(audit).where(
+                audit.c.environment_uid == self.scope, audit.c.request_uid == payload.request_uid
+            )
+        )
+        if event is None:
+            return False
+        if (
+            str(event["actor_uid"]) != str(self.actor)
+            or event["integration_key"] != key
+            or event["active"] != payload.active
+            or event["version"] != payload.expected_version + 1
+        ):
+            raise UserPreferencesError(
+                409, "request_conflict", "Integration activation request UID was reused"
+            )
+        return True
+
+    def save_integration(self, key, payload, provisioned):
+        self.require_manager()
+        if self._integration_replayed(key, payload):
+            return self.integration_policy()
+        policy = self.integration_policy()
+        if policy["version"] != payload.expected_version:
+            if self._integration_replayed(key, payload):
+                return self.integration_policy()
+            raise conflict()
+        bindings = read_bindings(self.store, self.scope, policy["connector_registry_revision"])
+        binding = known_binding(bindings, key)
+        modules = frozenset(policy["active_module_keys"]) | REQUIRED_MODULES
+        if payload.active and (
+            not integration_provisioned(binding, provisioned)
+            or not module_closure((binding.workflow.module,)) <= modules
+        ):
+            raise UserPreferencesError(
+                409, "integration_unavailable", "This integration requires its module to be active and available"
+            )
+        active = set(policy["active_integration_keys"])
+        previous_active = key in active
+        if payload.active:
+            active.add(key)
+        else:
+            active.discard(key)
+        version = policy["version"] + 1
+        stamp = now()
+        model = EnvironmentModuleActivation.__table__
+        try:
+            self._write_versioned(
+                [
+                    lock_admission(self.scope),
+                    GuardedStatement(
+                        update(model)
+                        .where(
+                            model.c.environment_uid == self.scope,
+                            model.c.version == policy["version"],
+                        )
+                        .values(
+                            active_integration_keys=sorted(active),
+                            actor_uid=self.actor,
+                            version=version,
+                            updated_at=stamp,
+                        )
+                        .returning(model.c.environment_uid),
+                        expect_rows=1,
+                        label="erp_integration_activation_version",
+                    ),
+                    insert(IntegrationActivationChange.__table__).values(
+                        uid=uuid4(),
+                        environment_uid=self.scope,
+                        request_uid=payload.request_uid,
+                        actor_uid=self.actor,
+                        occurred_at=stamp,
+                        version=version,
+                        integration_key=key,
+                        previous_active=previous_active,
+                        active=payload.active,
+                    ),
+                ]
+            )
+        except UserPreferencesError:
+            if self._integration_replayed(key, payload):
+                return self.integration_policy()
+            raise
+        return {**policy, "version": version, "active_integration_keys": sorted(active)}
 
     def _preference_row(self):
         model = UserPreference.__table__

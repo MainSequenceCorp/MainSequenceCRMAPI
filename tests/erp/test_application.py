@@ -4,7 +4,6 @@ from importlib import import_module
 from uuid import uuid4
 
 import pytest
-from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from api.erp.main import SETTINGS_PREFIX, create_app
@@ -35,29 +34,7 @@ def test_openapi_preserves_the_domain_path_and_method_inventory():
         assert composed == expected
 
 
-def test_shared_app_preserves_existing_google_and_campaign_paths():
-    application = create_app()
-    standalone = import_module("api.erp.crm.main").create_app()
-    prefixes = ("/extensions/google/", "/extensions/campaigns/")
-    expected = {
-        path: set(operations)
-        for path, operations in standalone.openapi()["paths"].items()
-        if path.startswith(prefixes)
-    }
-    assert {
-        path: set(operations)
-        for path, operations in application.openapi()["paths"].items()
-        if path.startswith(prefixes)
-    } == expected
-    assert "/extensions/campaigns/campaigns/" in expected
-    public = {"/extensions/google/oauth/callback/", "/extensions/google/oauth/done/"}
-    assert public <= {
-        route.path for route in application.routes
-        if isinstance(route, APIRoute) and "GET" in route.methods
-    }
-
-
-def test_shared_identity_and_module_admission_include_crm_mcp(monkeypatch):
+def test_shared_mcp_admits_each_module_without_weakening_crm_rest(monkeypatch):
     actor = identity.RequestUserIdentity(uid=str(uuid4()))
     source = uuid4()
     active = {"finance"}
@@ -76,11 +53,16 @@ def test_shared_identity_and_module_admission_include_crm_mcp(monkeypatch):
 
     monkeypatch.setenv("MAINSEQUENCE_ENDPOINT", "https://fixture.invalid")
     monkeypatch.setenv("ERP_USER_PREFERENCES_DATA_SOURCE_UID", str(source))
+    monkeypatch.setenv("ERP_USER_PREFERENCES_LOCAL_SCOPE_UID", str(source))
     monkeypatch.setenv("ERP_USER_PREFERENCES_PROVISIONED_MODULES", ",".join(MODULES))
     monkeypatch.setenv("FINANCE_SALES_ENABLED", "true")
     monkeypatch.setattr(identity, "_users_me", verify)
     monkeypatch.setattr("src.erp.user_preferences.admission.configured_store", lambda **_: object())
     monkeypatch.setattr("src.erp.user_preferences.admission.read_policy", read_policy)
+    monkeypatch.setattr("src.erp.user_preferences.service.read_policy", read_policy)
+    monkeypatch.setattr("api.erp.user_preferences.main.configured_store", lambda **_: object())
+    monkeypatch.setattr("api.erp.user_preferences.main._person", lambda **_: actor)
+    monkeypatch.setattr("api.erp.user_preferences.main.ready_modules", lambda *_, candidates, **__: candidates)
     monkeypatch.setattr("api.erp.crm.main.solution_selling_enabled", lambda: True)
 
     auth = {"Authorization": "Bearer fixture"}
@@ -122,9 +104,18 @@ def test_shared_identity_and_module_admission_include_crm_mcp(monkeypatch):
             assert denied.json()["error"]["code"] == "module_disabled"
             assert denied.json()["error"]["request_uid"]
 
-        denied = client.post("/mcp", headers=mcp_headers, json=mcp_list_tools)
-        assert denied.status_code == 403
-        assert denied.json()["error"]["code"] == "module_disabled"
+        limited = client.post("/mcp", headers=mcp_headers, json=mcp_list_tools)
+        assert limited.status_code == 200
+        visible = {tool["name"] for tool in limited.json()["result"]["tools"]}
+        assert "base_parties_list" in visible
+        assert "erp_modules_list" in visible
+        assert "crm_contacts_list" not in visible
+        assert "catalog_items_list" not in visible
+        for tool, expected in [("crm_contacts_list", "forbidden"), ("catalog_items_list", "module_disabled")]:
+            denied = client.post("/mcp", headers=mcp_headers, json={
+                **mcp_list_tools, "method": "tools/call", "params": {"name": tool, "arguments": {}},
+            })
+            assert denied.json()["result"]["structuredContent"]["code"] == expected
 
         active.update({"crm", "catalog", "sales"})
         assert client.get(sales_discovery, headers=auth).status_code == 200

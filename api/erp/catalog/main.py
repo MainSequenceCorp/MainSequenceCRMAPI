@@ -72,14 +72,18 @@ def discovery(resource):
     }
 
 
+def service_for(app: FastAPI, *, local: bool) -> Service:
+    actor, capabilities = actor_and_capabilities(local=local)
+    return Service(app.state.catalog_store, actor, capabilities)
+
+
 def create_app(*, enabled=True, local=False, install_identity=True):
     modules = resolve_modules(["catalog"] if enabled else [])
     app = FastAPI(title="Catalog API", version="0.1.0")
     app.state.catalog_store = Store(local_only=local)
 
     def service():
-        actor, capabilities = actor_and_capabilities(local=local)
-        return Service(app.state.catalog_store, actor, capabilities)
+        return service_for(app, local=local)
 
     @app.exception_handler(CatalogError)
     async def domain_error(_request, error):

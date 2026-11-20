@@ -1,6 +1,10 @@
-# CRM assistant
+# ERP assistant
 
-The optional assistant can find and explain CRM records and perform supported
+The shared ERP assistant can look up Directory and Catalog records when those
+modules are available, including with CRM disabled. The ERP shell opens the
+assistant rail and the full conversation page.
+
+When CRM is available, the assistant can find and explain CRM records and perform supported
 creates and versioned edits with the signed-in person's CRM permissions.
 It uses the same business rules as the forms and lists. An ordinary requested
 edit reads current state and supplies its version; a conflict requires another

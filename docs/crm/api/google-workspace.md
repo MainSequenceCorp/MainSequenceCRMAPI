@@ -1,53 +1,68 @@
 # Google Workspace API
 
-These routes are mounted when `extensions.google_workspace.active: true` in
-`config/erp/crm/settings.yaml`.
-The module also needs the [Google Cloud and CRM setup](../google_workspace_module/setup.md)
-and migration `0008`. All routes except the Google callback and its completion
-page need the verified Main Sequence caller and require
-`crm.transfer.import`. Creating a CRM record additionally requires
-`crm.create`; updating a linked Interaction requires `crm.edit`.
-The callback and completion handlers have no CRM bearer dependency. Deployed
-OAuth additionally needs exact `GET` `public_ingress` pairs on the FastAPI
-release, an active revision with that policy, and external verification. See
-the [public callback setup](../google_workspace_module/setup.md#configure-public-callback-routes-on-main-sequence).
-The application's request identity runs these two routes without a caller only
-when the deployment declares them and the platform gateway admits the request
-as public ingress. Both are mounted on the application itself rather than
-through the module's router: Main Sequence's launcher and the request identity
-look for each declared route in the application's own route list, where
-FastAPI 0.141 shows an included router as a single entry.
+GoogleConnector owns the Google OAuth registration, personal grants, callback
+and source reads. Enable Contacts, Gmail or Calendar in ERP Settings and allow
+the user to grant that capability. Access to CRM records follows CRM
+permissions. The operator publishes the connector release and supported
+CRM workflow keys through the ERP
+[connector registry](https://github.com/MainSequenceCorp/MainSequenceERPAPI/blob/main/engineering/architecture/adr/0002-provider-connectors-and-intake-ports.md).
+
+GoogleConnector publishes a manifest and serves connection status, consent,
+Calendar discovery and bounded source previews under `/api/connector/v1/`.
+CRM previews and writes use the current verified Main Sequence actor.
+
+## Google Contacts Connector intake
+
+Contacts and Gmail correspondents use `POST /api/crm/v1/intake/resolve/` and
+`POST /api/crm/v1/intake/commit/` with `crm.google-contacts` or
+`crm.google-gmail`. Use the read-purpose claim for resolution and the
+write-purpose claim for create or link. A link includes the chosen Contact
+UID and version. The response distinguishes archived source links from
+possible matches. CRM stores the Contact, audit and source identity in one
+governed transaction with the exact connector grant fence.
+
+## Gmail review and owner-selected refresh
+
+The Gmail REST and MCP business commands keep their review and save
+contracts. Search reads Gmail headers. Publication revalidates the reviewed
+destination, actor, audience and selected message fingerprints before saving.
+Use the existing thread selection endpoint to opt in to future replies. It
+records a cutoff and preserves the original selection across re-consent.
+
+CRM signs each delegated provider read for the exact actor, release,
+installation, operation and arguments. The connector verifies the signature,
+Main Sequence workload, current binding generation and grant. Before each eligible sync body
+read, the connector checks the CRM enrollment through its private
+`POST /api/crm/v1/intake/gmail/selection/` callback. The final governed write
+checks the exact active selection and grant generation again. A permitted
+owner can stop sync without a usable Gmail grant. Saved history follows CRM
+permissions.
+
+For every Google workflow, the connector sends open and close messages to
+`POST /api/crm/v1/intake/google/fence/`. This endpoint requires the configured
+connector workload. Closure records the exact generation even if an open
+never arrived. CRM business writes lock the fence in the same transaction
+as the record, audit and provenance.
+
+## Google Calendar Connector intake
+
+Enable `crm.google-calendar` in ERP Settings and connect a Google account.
+GoogleConnector supplies the calendar list and authorized, paginated event
+previews. Calendar-list permission is optional. With event permission, the
+user can enter a calendar ID and choose a range of up to 365 days. Review
+previews preserve the organizer, attendees, scheduled time and cancellation
+state for the CRM Interaction editor.
 
 | Method | Path | Request and result |
 | --- | --- | --- |
-| `POST` | `/extensions/google/oauth/start/` | No request body. Starts one Google consent for Contacts, Gmail, Calendar events, and the calendar picker. Returns an `authorization_url`, `attempt_uid`, and 600-second lifetime. The URL opens in a separate browser tab. |
-| `GET` | `/extensions/google/oauth/callback/` | Google sends `code` and `state`, or `error` and `state`. The backend consumes state once, exchanges the code with PKCE, validates the ID token, and redirects to the fixed completion page. The handler has no CRM bearer dependency; deployed public ingress is not yet verified. |
-| `GET` | `/extensions/google/oauth/done/` | Token-free browser page telling the user to return to CRM; the status query contains no credential or completion handle. |
-| `GET` | `/extensions/google/oauth/attempts/{uid}/` | Only the actor who started this attempt can read `waiting`, `ready`, `completed`, `failed`, or `expired`. `ready` returns a short-lived `completion_handle` through the authenticated CRM transport. A denial or failed exchange returns `failed` promptly. |
-| `POST` | `/extensions/google/oauth/complete/` | `{ "completion_handle": "…" }` activates the grant for the same actor and returns a token-free connection summary. |
-| `GET` | `/extensions/google/connections/` | `{ "items": [...] }`, containing at most the actor's own connection: UID, display email, granted source names, status, and version. This read works while Google operator credentials are not yet configured, so the module can show its setup state. |
-| `POST` | `/extensions/google/connections/{uid}/disconnect/` | Removes local token access, then attempts Google revocation; returns `google_revoked`. Imported CRM records remain. |
-| `GET` | `/extensions/google/calendars/` | Lists up to 100 calendars when calendar-list permission was granted. |
-| `POST` | `/extensions/google/preview/` | Source selection and optional `page_token`; Gmail also needs `gmail_query`, `time_min`, and `time_max` with a range of at most 90 days; Calendar needs `calendar_id`, `time_min`, and `time_max` with a range of at most 365 days. Calendar events are requested from Google in ascending start-time order, including across pages. Returns bounded candidates, matches/links, opaque preview tokens, and a next page token. Source links and Contact matches use up to two governed batch reads per page after the Google read. |
-| `POST` | `/extensions/google/imports/` | One reviewed decision: `preview_token`, `action` (`create`, `link`, `update`, `skip`), and selected CRM references. Contact creation may include `contact_fields` with reviewed `first_name`, `last_name`, `title`, `emails`, and `phones`; the API validates this through `ContactCreate` and accepts it only for Contact creation. Calendar create/update requires a nonempty reviewed `participants` array; each person may have a CRM `contact_uid`, email, or name. `company_uid` is optional. Update requires the linked `target_uid`, unchanged Company context, and `expected_version`. Returns the imported target UID or `skipped`. |
+| `GET` | `/api/connector/v1/sources/calendar.events/calendars/` | Use the GoogleConnector release with `binding=crm.google-calendar` and an optional `page_token`. Returns calendar IDs and display names and a next page token. |
+| `POST` | `/api/connector/v1/sources/calendar.events/preview/` | Send `binding`, `calendar_id`, `time_min`, `time_max` and an optional `page_token` to GoogleConnector. Returns the normalized candidate and distinct resolve and commit claims for each event. |
+| `POST` | `/api/crm/v1/intake/calendar/resolve/` | Send `binding` and up to 50 resolve `claim_tokens` to CRM. Resolved items report the source ID, linked Interaction UID and version, its Company, and whether the target is archived. |
+| `POST` | `/api/crm/v1/intake/calendar/commit/` | Send `binding`, the commit `claim_token` and `action` of `create`, `link`, `update`, or `skip`. Create and update require reviewed `participants` and accept `subject` and `status`. Create accepts optional Company and Deal references. Update requires the existing `target_uid`, `expected_version` and the original Company context. Link accepts a target Interaction and optional expected version. Skip saves nothing. |
 
-Calendar participant writes require schema revision `0009` on the active CRM
-provider. A process bound to the earlier `0008` schema cannot serve this import.
-
-The frontend sends Google preview and import requests through the normal
-delegated FastAPI transport. Google access and refresh tokens never appear in
-these responses. A preview token is encrypted for the actor and connection and
-expires after 15 minutes. A repeated source item is recognized through its
-source identity; a new create or link then returns a conflict rather than a
-duplicate. Gmail preview reads selected message headers only.
-The connection summary lists only sources whose required scopes Google actually
-granted. A partial grant permits those sources and keeps the others unavailable;
-another explicit Connect action can request the missing permissions.
-The Contact form is prefilled from the candidate, but nothing is saved until
-the user presses **Create Contact**. A successful response gives the CRM
-record UID for an **Open in CRM** link.
-
-These routes exist in source code. A deployed connection has **not** been
-verified; see [release evidence](../delivery/verification.md).
-
-Explicit message capture and selected-thread refresh are documented in [Emails](emails.md). The existing correspondent finder still imports Contacts only.
+CRM requires read and import access, plus create or edit access for the
+corresponding save. It checks the binding, live grant generation and current
+module policy. The same governed transaction guards CRM references and stores
+the Interaction, source link and audit. An archived target retains the
+source link. A duplicate, changed version or closed grant requires a fresh
+review.

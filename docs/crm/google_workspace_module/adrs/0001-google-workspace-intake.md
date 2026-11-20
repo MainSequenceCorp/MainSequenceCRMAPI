@@ -1,6 +1,6 @@
 # ADR 0001: User-authorized Google Workspace intake
 
-- **Status:** Accepted; source implementation is gated and deployed public ingress/OAuth remain unverified
+- **Status:** Historical provider design. GoogleConnector now owns OAuth, credentials, and Google reads.
 - **Date:** 2026-09-24
 - **Scope:** Gmail and Google Contacts contact intake; Google Calendar Interaction import
 - **Depends on:** [Core Interaction](../../crm_core/adrs/0001-interaction.md) and the existing
@@ -10,7 +10,10 @@
 
 Email-body retention and selected-thread sync are superseded by
 [ADR 0002](0002-selected-email-history.md). Its explicit selection rules prohibit
-automatic whole-mailbox import. Other intake and credential decisions still apply.
+automatic whole-mailbox import. The following records the original
+implementation. Use the [current Google Workspace API](../../api/google-workspace.md)
+for implemented routes and the [connector setup guide](../setup.md) for
+configuration.
 
 ## Context
 
@@ -89,7 +92,7 @@ policy before Google can reach it. Read `resource_release.get` to confirm
 `public_url`; append the callback path to that URL and register the result in
 Google. All other CRM routes stay bearer protected. Public admission provides
 no Main Sequence user identity; the callback consumes the one-time OAuth state
-and PKCE verifier. The full [setup procedure](../setup.md#configure-public-callback-routes-on-main-sequence)
+and PKCE verifier. The full [setup procedure](../setup.md)
 includes workflow validation and unauthenticated probes. No public ingress
 declaration or deployed callback result has yet been verified for this CRM.
 

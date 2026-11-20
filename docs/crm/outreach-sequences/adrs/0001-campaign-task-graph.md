@@ -1,6 +1,6 @@
 # ADR 0001: Campaigns as a live DAG of prompted task definitions
 
-- **Status:** Accepted and implemented (2026-10-24). The [concept](../../concepts/campaigns.md) and [API](../../api/campaigns.md) pages describe the mounted behavior; the amendments below record decisions taken during implementation.
+- **Status:** Accepted and implemented (2026-10-24). The [concept](../../concepts/outreach-sequences.md) and [API](../../api/outreach-sequences.md) pages describe the mounted behavior; the amendments below record decisions taken during implementation. This historical ADR uses the original Campaigns names.
 - **Date:** 2026-10-24
 - **Scope:** Optional Campaigns module, visual design, contact progression, application MCP and agent usage skills.
 - **Related:** Existing [Contacts](../../concepts/contacts.md), [Tasks](../../concepts/tasks-notes.md), [Agent Prompts](../../concepts/prompts.md), [application MCP](../../api/mcp.md) and [module boundaries](../../concepts/index.md).

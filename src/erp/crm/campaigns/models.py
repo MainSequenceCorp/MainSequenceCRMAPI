@@ -301,7 +301,7 @@ class CampaignChanges(NonEmptyChanges):
     @classmethod
     def required_fields(cls, value, info):
         if value is None:
-            raise ValueError("Campaign fields cannot be null")
+            raise ValueError("Sequence fields cannot be null")
         if info.field_name == "objective":
             return validate_markdown(value)
         if info.field_name == "context":

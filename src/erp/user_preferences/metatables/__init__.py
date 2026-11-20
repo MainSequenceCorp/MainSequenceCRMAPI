@@ -6,11 +6,15 @@ from uuid import UUID
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     MetaData,
+    String,
+    Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 
@@ -89,6 +93,18 @@ class EnvironmentModuleActivation(Owned, UpdatedFields, PlatformManagedMetaTable
     active_module_keys: Mapped[list[str]] = field(
         "Active modules", "Optional modules selected by an authorized administrator.", JSON()
     )
+    active_integration_keys: Mapped[list[str]] = field(
+        "Active integrations",
+        "Optional provider integrations enabled for this Environment.",
+        JSON(),
+        server_default=text("'[]'"),
+    )
+    connector_registry_revision: Mapped[int] = field(
+        "Connector registry revision",
+        "Active registry revision for this Environment, zero before publication.",
+        BigInteger(),
+        server_default=text("0"),
+    )
     actor_uid: Mapped[UUID] = field(
         "Updated by", "Verified platform person responsible for the latest policy update.", Uuid()
     )
@@ -123,6 +139,42 @@ class ModuleActivationChange(Owned, ScopeFields, PlatformManagedMetaTable, Base)
     )
 
 
+class IntegrationActivationChange(Owned, ScopeFields, PlatformManagedMetaTable, Base):
+    __metatable_description__ = (
+        "Append-only audit of administrator changes to one optional ERP integration."
+    )
+    __table_args__ = (
+        UniqueConstraint(
+            "environment_uid", "request_uid", name="uq_erp_integration_activation_scope_request"
+        ),
+        CheckConstraint("version > 0", name="ck_erp_integration_activation_change_version"),
+    )
+    uid: Mapped[UUID] = field(
+        "UID", "Stable identifier for this activation change.", Uuid(), primary_key=True
+    )
+    request_uid: Mapped[UUID] = field(
+        "Request UID", "Request identity used to reconcile a repeated activation save.", Uuid()
+    )
+    actor_uid: Mapped[UUID] = field(
+        "Actor", "Verified platform person who made the integration change.", Uuid()
+    )
+    occurred_at: Mapped[datetime] = field(
+        "Occurred at", "UTC time of the committed activation change.", DateTime(timezone=True)
+    )
+    version: Mapped[int] = field(
+        "Version", "Shared ERP policy version committed by this change.", BigInteger()
+    )
+    integration_key: Mapped[str] = field(
+        "Integration key", "Stable key of the optional ERP workflow.", String(128)
+    )
+    previous_active: Mapped[bool] = field(
+        "Previously active", "Whether the integration was selected before the change.", Boolean()
+    )
+    active: Mapped[bool] = field(
+        "Active", "Whether the integration is selected after the change.", Boolean()
+    )
+
+
 class ModuleAdmissionLock(Owned, PlatformManagedMetaTable, Base):
     __metatable_namespaces__ = (ADMISSION_NAMESPACE,)
     __metatable_description__ = (
@@ -139,10 +191,39 @@ class ModuleAdmissionLock(Owned, PlatformManagedMetaTable, Base):
     )
 
 
+class ConnectorRegistryRevision(Owned, PlatformManagedMetaTable, Base):
+    __metatable_namespaces__ = (POLICY_NAMESPACE,)
+    __metatable_description__ = (
+        "An immutable ERP connector registry publication, including its approved runtime bindings."
+    )
+    __table_args__ = (CheckConstraint("revision > 0", name="ck_erp_registry_revision"),)
+    environment_uid: Mapped[UUID] = field(
+        "Environment", "Verified Environment that owns this publication.", Uuid(), primary_key=True
+    )
+    revision: Mapped[int] = field(
+        "Revision", "Monotonically increasing Environment publication number.",
+        BigInteger(), primary_key=True,
+    )
+    published_by_uid: Mapped[UUID] = field(
+        "Publisher", "Verified ERP administrator who approved the registry.", Uuid()
+    )
+    published_at: Mapped[datetime] = field(
+        "Published at", "UTC time the revision became active.", DateTime(timezone=True)
+    )
+    document_yaml: Mapped[str] = field(
+        "YAML document", "Validated connector release and workflow configuration.", Text()
+    )
+    bindings: Mapped[list[dict]] = field(
+        "Runtime bindings", "Resolved installation, workflow, release and workload identities.", JSON()
+    )
+
+
 MODELS = (
     UserPreference,
     EnvironmentModuleActivation,
     ModuleActivationChange,
     ModuleAdmissionLock,
+    IntegrationActivationChange,
+    ConnectorRegistryRevision,
 )
 ADMISSION_MODELS = (EnvironmentModuleActivation, ModuleAdmissionLock)

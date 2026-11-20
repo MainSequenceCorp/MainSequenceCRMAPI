@@ -1,12 +1,12 @@
-# Campaigns
+# Outreach Sequences
 
-A **Campaign** is one live directed acyclic graph of prompted task
-definitions, implemented by the optional Campaigns module
+An **Outreach Sequence** is one live directed acyclic graph of prompted task
+definitions, implemented by the optional Outreach Sequences extension
 (`extensions.campaigns.active` in `config/erp/crm/settings.yaml`). Each enrolled Contact
 follows the graph according to the outcomes recorded for that person. The
 module uses existing [Contacts](contacts.md), [Tasks](tasks-notes.md) and the
 [Agent Prompt](prompts.md) library; it adds no user, tenant, permission or
-delivery system. [ADR 0001](../campaigns_module/adrs/0001-campaign-task-graph.md)
+delivery system. [ADR 0001](../outreach-sequences/adrs/0001-campaign-task-graph.md)
 records the design decisions; this page describes the implemented behavior.
 
 ## Definition versus instance
@@ -117,6 +117,6 @@ per step; thirty declared inputs, result fields or bindings; fifty evidence
 items per instance; 16 KiB JSON values for context, results and assignments;
 64 KiB Markdown. Collections are paged (at most 100 per page).
 
-See the [Campaigns API](../api/campaigns.md) for routes, payloads and MCP
+See the [Outreach Sequences API](../api/outreach-sequences.md) for routes, payloads and MCP
 tools, and [persistence](../delivery/persistence.md#campaigns-revision-0013)
 for the tables.

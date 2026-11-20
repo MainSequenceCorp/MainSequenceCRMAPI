@@ -19,6 +19,29 @@ must accompany material changes. The running FastAPI OpenAPI document can be
 compared with the [mounted route index](../api/route-index.md);
 `tests/erp/crm/documentation/test_documentation.py` enforces method/path parity.
 
+### Outreach Sequences public rename (2026-11-18)
+
+The local implementation uses `/outreach-sequences`, Help at
+`/docs/outreach-sequences/`, `/extensions/outreach-sequences/` for the API, and
+the 21 `crm_outreach_sequences_*` MCP tools. The published usage skill is
+`crm-outreach-sequences`. [Current API](../api/outreach-sequences.md)
+
+- The focused API, bootstrap, MCP, skill publication and route index suite
+  passed 52 tests. The strict MkDocs build passed.
+- A fresh API using the real SDK sign-in and isolated, verified MetaTables
+  SQLite advertised `modules.outreach_sequences` and all 21 renamed tools.
+  The old HTTP path returned 404 and the old MCP tool was rejected.
+- The browser fixture verified navigation, sequence details, graph edits,
+  enrollment, the new Help URL, and retired and disabled route behavior.
+  Frontend unit tests, theme audit, and the combined app and Help build passed.
+
+The isolated SQLite API mounted the renamed endpoints. Real sequence listing
+still uses PostgreSQL-specific SQL and returned the existing dialect mismatch
+from MetaTables. End-to-end sequence behavior was tested with fixtures; the
+production database behavior below is historical. The rename did not require a
+schema revision. Hosted deployment and the proposed Marketing reply handoff
+were outside this local change.
+
 ### Campaigns module (2026-10-24)
 
 Implemented ADR 0001 end to end: six tables (revision `0013`), the
@@ -978,7 +1001,7 @@ real provider/model, the project prompt and local CRM MCP bridge, verifies an
 actual governed read, then restarts Tau and the CRM API to check persisted
 local history and independent read-back. CRM calls are read-only; hosted
 storage and credentials are not replaced by mocks. See the
-[local check procedure](local-development.md#optional-live-assistant-smoke-test).
+[manual assistant smoke test](local-development.md#optional-live-assistant-smoke-test).
 
 The first executed 2.0.11 local run failed during startup with
 `Main Sequence JWT refresh failed`. Tau was reading legacy access/refresh
@@ -1838,19 +1861,11 @@ runtime context. They do not establish a live principal or policy binding.
 The managed Agent release was deployed on 2026-09-26; provider, identity, and
 deployed-catalog behavior remain unverified through a live CRM conversation.
 
-The Google Workspace extension is implemented in source and enabled by
-`extensions.google_workspace.active: true` in `config/erp/crm/settings.yaml`. Local Google
-Contacts consent and preview were verified as described below; the deployed
-frontend/API handoff remains **unverified**. The CRM API workflow
-declares exact FastAPI `public_ingress` for
-`GET /extensions/google/oauth/callback/` and
-`GET /extensions/google/oauth/done/`. The exact branch's Main Sequence
-`validate-workflow/` endpoint accepted the API 2.3.0 declaration with no
-errors or warnings. The API release deployment failed during runtime activation,
-so its public ingress has not been externally probed. Confirm the release's
-`effective_public_ingress` and backend-issued `public_url` before registering
-the Google redirect URI; see the
-[setup procedure](../google_workspace_module/setup.md#configure-public-callback-routes-on-main-sequence).
+The following local results are historical evidence for the former CRM-owned
+Google integration. Its historical API 2.3.0 public-ingress declaration passed
+workflow validation, but the release failed during runtime activation.
+GoogleConnector now owns Google authorization and source reads. See the
+[connector setup](../google_workspace_module/setup.md) for current guidance.
 Migration `0008` applied to the configured local provider and a
 fresh process resolved 26 active bindings. A synthetic governed probe
 created an OAuth attempt, activated a token-shaped connection, imported a

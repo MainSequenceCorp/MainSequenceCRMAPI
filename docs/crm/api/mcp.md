@@ -1,4 +1,4 @@
-# CRM application MCP
+# ERP application MCP and CRM tools
 
 `POST /mcp` serves authenticated, stateless Streamable HTTP with JSON responses.
 It implements MCP initialization/discovery, `tools/list`, `tools/call`,
@@ -6,10 +6,20 @@ It implements MCP initialization/discovery, `tools/list`, `tools/call`,
 is not public ingress and is outside the REST OpenAPI route index. The Main
 Sequence SDK rejects other methods and unapproved browser Origins.
 
-The catalogue is built from the same typed models as the CRM service. It has
-72 tools (41 reads, 31 writes) with Solution Selling active, or 48 tools when
-disabled. Tool names retain `crm_<resource>_<operation>`. Discover the exact
-schema through `tools/list`; for example:
+The shared ERP entrypoint serves the CRM catalogue and the tools for the other
+ERP modules and Settings. Discovery and every business call check the verified
+person, current module activation, readiness and workflow permissions. A person
+can use authorized ERP tools with CRM disabled. The standalone CRM entrypoint
+serves its CRM catalogue.
+
+Use `erp_modules_list` to check access and `tools/list` for the full current
+catalogue. Call `erp_tools_describe` with a module such as `sales` and optionally
+an exact tool name such as `sales_orders_create` to fetch a bounded set of input
+schemas. Module skills explain required versions and owner workflows.
+Discovery omits unavailable or unauthorized tools. A direct call to an inactive
+ERP owner returns `module_disabled`. Financial posting, selected reversals and
+archival, public publication, bank reconciliation commit and module activation
+commit use the reviewed ERP screens. This example calls a CRM tool.
 
 ```json
 {
@@ -97,22 +107,28 @@ treated as uncertain when it reports a failed call.
 
 ## CRM usage skill pack
 
-The six authored business skills live under `.tau/skills/crm/`, the deployed CRM assistant's own
-skills folder, beside its `solution-selling/solution-selling-workflow` skill. The API publishes
-that folder as a whole, so the assistant's skills and the published skills are one set; the
-development skills under `.agents/skills/` are never published:
+The six CRM business skills live under `.tau/skills/crm/`, alongside the
+`solution-selling/solution-selling-workflow` skill. The API publishes the ERP
+root `.tau/skills/`, including the shared `erp` workflow and each module's
+own skills. Development skills stay under `.agents/skills/`.
+
+During the ERP rollout, the shared endpoint accepts the 21 previous Campaign
+tool names on direct `tools/call` and resolves them to the matching Outreach
+Sequence operations under the same requester permissions. The seven previous
+CRM skill URLs and their files remain readable by exact URI. Discovery
+advertises the current tool names and module-grouped skills.
 
 | Skill | Primary tools | Business workflow |
 | --- | --- | --- |
-| `crm-core` | 39 | Contacts, Companies, affiliations, Notes, tags, activity, Tasks, Interactions, read-only Agent Prompts, owner selection, settings and Contact merge previews. |
+| `crm-core` | 50 | Contacts, Companies, affiliations, Notes, tags, activity, Tasks, Interactions, read-only Agent Prompts, owner selection, settings and Contact merge previews. |
 | `crm-deals` | 9 | Deal records, pipeline metadata, stages, boards and versioned moves. |
 | `solution-selling/crm-prospecting` | 8 | Prospecting profiles and the required-prompter outreach workflow, actual Interaction recording, Lead state and linking the next Contact Task. |
 | `solution-selling/crm-prompters` | 6 | Template maintenance, subject/body rendering and validation of edited unsaved drafts. |
 | `solution-selling/crm-discovery` | 10 | Diagnosis preparation and records, Deal assessments and Solution Selling context. |
-| `crm-campaigns` | 21 | Campaign graphs and step prompts, explicit enrollment, campaign task briefings, outcomes, waits, blocks, reconciliation and A/B interpretation. |
+| `crm-outreach-sequences` | 21 | Sequence graphs and step prompts, explicit enrollment, Task briefings, outcomes, waits, blocks, reconciliation and A/B interpretation. |
 
-The allocation covers all 93 business tools exactly once; workflows can reuse
-another skill's operations. With Solution Selling disabled, 69 tools remain;
+The allocation covers all 104 business tools exactly once; workflows can reuse
+another skill's operations. With Solution Selling disabled, 80 tools remain;
 with Campaigns disabled, its 21 tools are not advertised. Simple record operations stay grouped in core; separate skills cover
 the workflows with distinct decisions and evidence requirements.
 
@@ -164,7 +180,7 @@ MCP Python SDK 2.x, the CRM server installs it using:
 from mcp.server.mcpserver import MCPServer
 from mainsequence.server.mcp_skills import skills_extension
 
-mcp = MCPServer("crm", extensions=[skills_extension(".agents/skills/mainsequence_crm")])
+mcp = MCPServer("crm", extensions=[skills_extension(".tau/skills")])
 ```
 
 The implementation subclasses `MCPServer`'s public tool methods to preserve
@@ -179,7 +195,7 @@ there is no generated package or second publication folder:
 
 ```text
 .tau/skills/crm/
-  crm-campaigns/SKILL.md
+  crm-outreach-sequences/SKILL.md
   crm-core/
     SKILL.md
     references/mcp-usage.md
@@ -196,8 +212,8 @@ there is no generated package or second publication folder:
 
 Each skill's frontmatter name matches its folder. Group names use hyphens;
 supporting files belong to a skill. Shared guidance is stored and served once
-from `crm-core`, at `skill://crm-core/references/mcp-usage.md`. The three module
-skills have URIs such as `skill://solution-selling/crm-prompters/SKILL.md`.
+from `crm-core`, at `skill://crm/crm-core/references/mcp-usage.md`. The three module
+skills have URIs such as `skill://crm/solution-selling/crm-prompters/SKILL.md`.
 Relative folder resolution is independent of the process working directory.
 Changes to the pack take effect after restarting the API.
 
@@ -208,7 +224,7 @@ capabilities, but the registered skill methods and file reads are available.
 Manifests contain the byte size and SHA-256 digest of every served file.
 Unpublished files and unknown URIs return MCP errors.
 
-All seven skills remain published when Solution Selling is disabled. Its tools
+The CRM skills remain published when Solution Selling is disabled. Its tools
 then disappear from `tools/list`; skill presence does not enable a module.
 Discovery and file reads require the same verified HTTP identity and permitted
 Origin as tools. They expose authored instructions, require no CRM database

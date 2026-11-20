@@ -34,6 +34,7 @@ from src.erp.module_access import module_available
 from src.erp.module_access.http import install_module_admission
 from src.erp.modules import resolve_modules
 
+from .banking_routes import FENCE_PATH, banking_routes
 from .identity import actor_and_capabilities
 
 PREFIX = "/api/finance/v1"
@@ -92,25 +93,29 @@ def discovery(resource):
     }
 
 
+def service_for(app: FastAPI, *, local: bool) -> Service:
+    actor, caps = actor_and_capabilities(local=local)
+    base_actor, base_caps = base_identity(local=local)
+
+    def sales():
+        from src.erp.finance.sales_integration import configured_sales
+
+        return configured_sales(local=local)
+
+    dependencies = Dependencies(
+        BaseService(BaseStore(local_only=local), base_actor, base_caps),
+        sales if os.environ.get("FINANCE_SALES_ENABLED", "true") != "false" else None,
+    )
+    return Service(app.state.finance_store, actor, caps, dependencies)
+
+
 def create_app(*, enabled=True, local=False, install_identity=True):
     resolve_modules(["base", "finance"] if enabled else [])
     app = FastAPI(title="Finance API", version="0.1.0")
     app.state.finance_store = Store(local_only=local)
 
     def service():
-        actor, caps = actor_and_capabilities(local=local)
-        base_actor, base_caps = base_identity(local=local)
-
-        def sales():
-            from src.erp.finance.sales_integration import configured_sales
-
-            return configured_sales(local=local)
-
-        dependencies = Dependencies(
-            BaseService(BaseStore(local_only=local), base_actor, base_caps),
-            sales if os.environ.get("FINANCE_SALES_ENABLED", "true") != "false" else None,
-        )
-        return Service(app.state.finance_store, actor, caps, dependencies)
+        return service_for(app, local=local)
 
     async def domain_error(_request, error):
         return JSONResponse(
@@ -147,7 +152,7 @@ def create_app(*, enabled=True, local=False, install_identity=True):
                 "status": "ready",
                 "module": "finance",
                 "local": local,
-                "schema_revision": "0002",
+                "schema_revision": "0004",
                 "data_source_uid": current.store.data_source_uid,
                 "dependencies": current.dependencies.ready(),
                 "capabilities": sorted(current.capabilities),
@@ -273,7 +278,10 @@ def create_app(*, enabled=True, local=False, install_identity=True):
 
         mount("invoices", InvoiceCreate, InvoiceUpdate)
         mount("payments", PaymentCreate, PaymentUpdate)
-    install_module_admission(app, "finance")
+        banking = banking_routes(service, app.state.finance_store, local=local)
+        app.state.erp_mcp_banking_routes = tuple(banking.routes)
+        app.include_router(banking)
+    install_module_admission(app, "finance", policy_exempt=(("POST", FENCE_PATH),))
     if install_identity:
         install_request_identity(app)
     return app

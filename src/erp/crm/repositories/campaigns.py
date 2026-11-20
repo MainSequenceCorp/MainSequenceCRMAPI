@@ -154,7 +154,7 @@ class CampaignStore(GovernedGateway):
         result = self._operation(operation="select", sql=sql, parameters={"uid": str(uid)}, parameter_types={}, max_rows=1)
         rows = result.get("rows")
         if not isinstance(rows, list) or not rows:
-            raise ResourceNotFound("Campaign not found")
+            raise ResourceNotFound("Outreach sequence not found")
         row = rows[0]
         item = self._json(row["item"], expected=dict, label="campaign")
         item["steps"] = self._json(row["steps"], expected=list, label="campaign steps")
@@ -235,7 +235,7 @@ class CampaignStore(GovernedGateway):
         result = self._operation(operation="select", sql=sql, parameters={"uid": str(uid)}, parameter_types={}, max_rows=1)
         rows = result.get("rows")
         if not isinstance(rows, list) or not rows:
-            raise ResourceNotFound("Campaign step prompt not found")
+            raise ResourceNotFound("Sequence step prompt not found")
         return self._json(rows[0]["item"], expected=dict, label="step prompt")
 
     def participant_collection(self, *, page_index: int, page_size: int, search: str | None,
@@ -262,7 +262,7 @@ class CampaignStore(GovernedGateway):
         result = self._operation(operation="select", sql=sql, parameters={"uid": str(uid)}, parameter_types={}, max_rows=1)
         rows = result.get("rows")
         if not isinstance(rows, list) or not rows:
-            raise ResourceNotFound("Campaign participant not found")
+            raise ResourceNotFound("Sequence participant not found")
         return self._json(rows[0]["item"], expected=dict, label="participant")
 
     def graph_impact(self, campaign_uid: uuid.UUID, *, affected_step_uids: list[uuid.UUID],
@@ -350,7 +350,7 @@ class CampaignStore(GovernedGateway):
             "%(objective)s, %(owner_uid)s::uuid, %(context)s::jsonb, 'draft', NULL) RETURNING uid) "
             f"INSERT INTO {_table('activity_event')} {ACTIVITY_COLUMNS} {self._activity('created')} RETURNING entity_uid"
         )
-        self._write(sql, params, types, conflict="Campaign create precondition failed")
+        self._write(sql, params, types, conflict="Sequence create precondition failed")
         return self.campaign_detail(uid)
 
     def update_campaign(self, actor_uid: uuid.UUID, uid: uuid.UUID, expected_version: int,
@@ -389,7 +389,7 @@ class CampaignStore(GovernedGateway):
             "WITH " + ", ".join(ctes) + f" INSERT INTO {_table('activity_event')} {ACTIVITY_COLUMNS} "
             f"{self._activity(source)} RETURNING entity_uid"
         )
-        self._write(sql, params, types, conflict="Campaign version precondition failed")
+        self._write(sql, params, types, conflict="Sequence version precondition failed")
         return self.campaign_detail(uid)
 
     def archive_campaign(self, actor_uid: uuid.UUID, uid: uuid.UUID, expected_version: int, archived: bool) -> dict[str, Any]:
@@ -402,7 +402,7 @@ class CampaignStore(GovernedGateway):
             "WHERE c.uid=%(uid)s::uuid AND c.version=%(expected_version)s::bigint RETURNING c.uid) "
             f"INSERT INTO {_table('activity_event')} {ACTIVITY_COLUMNS} {self._activity('changed')} RETURNING entity_uid"
         )
-        self._write(sql, params, types, conflict="Campaign version precondition failed")
+        self._write(sql, params, types, conflict="Sequence version precondition failed")
         return self.campaign_detail(uid)
 
     def save_graph(
@@ -516,7 +516,7 @@ class CampaignStore(GovernedGateway):
             "(SELECT count(*) FROM layout_saved) ls WHERE c.uid=%(campaign_uid)s::uuid RETURNING c.uid) "
             f"INSERT INTO {_table('activity_event')} {ACTIVITY_COLUMNS} {self._activity('changed')} RETURNING entity_uid"
         )
-        self._write(sql, params, types, conflict="Campaign graph version or prompt precondition failed")
+        self._write(sql, params, types, conflict="Sequence graph version or prompt precondition failed")
         return self.campaign_detail(campaign_uid)
 
     # ----- step prompt writes ---------------------------------------------
@@ -638,7 +638,7 @@ class CampaignStore(GovernedGateway):
             "CASE WHEN gate.entry_step_uid IS NULL THEN NULL ELSE NOW() END, NULL FROM gate RETURNING uid) "
             f"INSERT INTO {_table('activity_event')} {ACTIVITY_COLUMNS} {self._activity('created')} RETURNING entity_uid"
         )
-        self._write(sql, params, types, conflict="Contact is already enrolled, archived, or the campaign is unavailable")
+        self._write(sql, params, types, conflict="The Contact is already enrolled or archived, or the sequence is unavailable")
         return self.participant_detail(uid)
 
     def update_participant(self, actor_uid: uuid.UUID, uid: uuid.UUID, expected_version: int,

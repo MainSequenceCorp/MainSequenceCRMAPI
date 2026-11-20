@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from api.erp.crm.affiliation_routes import router as affiliation_router
+from api.erp.crm.campaign_routes import mount_campaign_compatibility
 from api.erp.crm.campaign_routes import router as campaign_router
 from api.erp.crm.email_routes import router as email_router
 from api.erp.crm.google_routes import mount_public_routes as mount_google_public_routes
@@ -32,7 +33,8 @@ from src.erp.module_access.http import install_module_admission
 BOOTSTRAP_STAGE_TIMEOUT_SECONDS = 75
 
 
-def install_crm_http(application: FastAPI, *, policy_exempt=()) -> None:
+def install_crm_http(application: FastAPI, *, policy_exempt=(), policy_exempt_paths=()) -> None:
+    """Register the CRM HTTP routes and admission inside the host's SDK identity."""
     crm_config()  # Fail before route mounting if the persisted configuration is invalid.
     application.state.crm_local_tau_origin = None
     install_platform_services(application)
@@ -79,11 +81,14 @@ def install_crm_http(application: FastAPI, *, policy_exempt=()) -> None:
         application.include_router(module_router)
     if campaigns_enabled():
         application.include_router(campaign_router)
-    # Once, after every route is mounted, so the deployment's public ingress
-    # routes can be checked and caller verification runs before any CRM
-    # middleware or route: a platform-signed caller assertion when deployed, a
-    # direct Bearer token locally. authenticated_actor() reads the result.
-    install_module_admission(application, "crm", policy_exempt=policy_exempt)
+        mount_campaign_compatibility(application)
+    # The SDK verifies the caller before CRM module admission.
+    install_module_admission(
+        application,
+        "crm",
+        policy_exempt=policy_exempt,
+        policy_exempt_paths=policy_exempt_paths,
+    )
 
 
 def create_app() -> FastAPI:
@@ -173,7 +178,10 @@ async def bootstrap(request: Request, actor_uid=Depends(authenticated_actor)):
         document["assistant"] = await resolve_assistant(
             request.app.state.crm_local_tau_origin
         )
-        return Bootstrap.model_validate(document).model_dump(mode="json")
+        payload = Bootstrap.model_validate(document).model_dump(mode="json")
+        if "outreach_sequences" in payload["modules"]:
+            payload["modules"]["campaigns"] = payload["modules"]["outreach_sequences"]
+        return payload
     except TimeoutError as exc:
         return JSONResponse(
             _error(request, "CRM_NOT_READY", report_readiness_failure(

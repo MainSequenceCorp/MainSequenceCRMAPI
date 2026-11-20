@@ -16,7 +16,7 @@ nav:
       - Deals and pipelines: concepts/deals-pipelines.md
       - Tasks and notes: concepts/tasks-notes.md
       - Prompts: concepts/prompts.md
-      - Campaigns: concepts/campaigns.md
+      - Outreach Sequences: concepts/outreach-sequences.md
       - Interactions: concepts/interactions.md
       - Emails: concepts/emails.md
       - Tags and activity: concepts/tags-activity.md
@@ -33,13 +33,14 @@ nav:
       - Interactions: api/interactions.md
       - Emails: api/emails.md
       - Solution Selling: api/solution-selling.md
-      - Campaigns: api/campaigns.md
+      - Outreach Sequences: api/outreach-sequences.md
       - Google Workspace: api/google-workspace.md
       - Imports and transfers: api/transfers.md
       - Service and settings: api/service.md
       - Application MCP: api/mcp.md
   - Delivery:
       - Local development: delivery/local-development.md
+      - Build ERP connectors: delivery/build-erp-connectors.md
       - Base identity adoption: delivery/base-adoption.md
       - Persistence and migrations: delivery/persistence.md
       - Verification and release: delivery/verification.md
@@ -64,10 +65,10 @@ nav:
           - '0004: Prospecting profiles': solution_selling_module/adrs/0004-prospecting-profiles.md
           - '0005: Lead list': solution_selling_module/adrs/0005-lead-list.md
           - '0006: Reusable prompters': solution_selling_module/adrs/0006-reusable-prompters.md
-  - Campaigns module:
-      - Overview: campaigns_module/index.md
-      - 'ADR 0001: Campaign task graph': campaigns_module/adrs/0001-campaign-task-graph.md
-      - Implementation plan: campaigns_module/implementation-plan.md
+  - Outreach Sequences:
+      - Overview: outreach-sequences/index.md
+      - 'ADR 0001: Campaign task graph': outreach-sequences/adrs/0001-campaign-task-graph.md
+      - Implementation plan: outreach-sequences/implementation-plan.md
 validation:
   nav:
     omitted_files: warn

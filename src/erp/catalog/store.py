@@ -4,8 +4,8 @@ from functools import cached_property
 
 from metatables import MetaTable, get_runtime_status
 from metatables.compiled_sql.v1 import compile_sqlalchemy_statement, compile_sqlalchemy_statements
-from src.erp.catalog.metatables import MODELS
 from src.erp.catalog_bindings import active_catalog_rows
+from src.erp.catalog.metatables import MODELS
 from src.erp.module_access import execute_write, guard_write
 
 

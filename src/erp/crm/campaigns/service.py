@@ -88,7 +88,7 @@ class CampaignOperations:
         from ..services.operations import ServiceUnavailable
 
         if not campaigns_enabled():
-            raise ServiceUnavailable("Campaigns module is disabled")
+            raise ServiceUnavailable("Outreach Sequences is disabled")
         for capability in capabilities:
             self.context.require(capability)
 
@@ -192,7 +192,7 @@ class CampaignOperations:
         self._owner(changes.get("owner_uid"))
         current = self.store.campaign_detail(uid)
         if current["version"] != patch.expected_version:
-            raise ResourceConflict("Campaign version precondition failed")
+            raise ResourceConflict("Sequence version precondition failed")
         if "status" in changes:
             target = changes["status"]
             if target not in ALLOWED_STATUS[current["status"]]:
@@ -299,7 +299,7 @@ class CampaignOperations:
             self._require("crm.archive")
         current = self.store.campaign_detail(uid)
         if current["version"] != command.expected_version:
-            raise ResourceConflict("Campaign version precondition failed")
+            raise ResourceConflict("Sequence version precondition failed")
         for step in command.graph.steps:
             self._owner(step.owner_uid)
         validation = self._validation(command.graph)
@@ -457,11 +457,11 @@ class CampaignOperations:
         participant = self.store.participant_detail(ref.participant_uid)
         progress = self._progress(participant, ref.step_uid)
         if progress is None:
-            raise ResourceNotFound("Campaign task not found for this participant and step")
+            raise ResourceNotFound("Sequence task not found for this participant and step")
         campaign = self.store.campaign_detail(participant["campaign_uid"])
         step_row = self._step(campaign, ref.step_uid)
         if step_row is None:
-            raise ResourceNotFound("Campaign step not found")
+            raise ResourceNotFound("Sequence step not found")
         return {"participant": participant, "progress": progress, "campaign": campaign, "step_row": step_row}
 
     def _current_prompt(self, step_row: dict[str, Any], assignment: dict[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, str]]]:
@@ -487,7 +487,7 @@ class CampaignOperations:
         if step_row["archived_at"] is not None:
             diagnostics.append({"code": "step_retired", "message": "This step was retired; reconcile the open task"})
         if campaign["status"] != "active":
-            diagnostics.append({"code": "campaign_inactive", "message": f"The campaign is {campaign['status']}"})
+            diagnostics.append({"code": "campaign_inactive", "message": f"The sequence is {campaign['status']}"})
         prompt, prompt_diagnostics = self._current_prompt(step_row, progress["prompt_assignment"])
         diagnostics.extend(prompt_diagnostics)
         contact = self.resources.detail("contacts", uuid.UUID(str(participant["contact_uid"])))

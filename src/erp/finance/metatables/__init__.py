@@ -286,8 +286,136 @@ class AuditEvent(Owned, PlatformManagedMetaTable, Base):
     )
 
 
+def bank_field(label, type_, *args, **kwargs):
+    return field(label, label + " for the Finance banking reconciliation workflow.", type_, *args, **kwargs)
+
+
+class BankAccount(Owned, PlatformManagedMetaTable, Base):
+    __tablename__ = "erp_finance__bank_account"
+    __metatable_identifier__ = "erp_finance.bank_account"
+    __metatable_description__ = "Canonical operating-company account for reconciling movements from any connector."
+    __table_args__ = (UniqueConstraint("environment_uid", "company_uid", "fingerprint", "currency_uid"),)
+    environment_uid: Mapped[UUID] = bank_field("Verified ERP Environment", Uuid())
+    company_uid: Mapped[UUID] = bank_field("Base operating company", Uuid())
+    currency_uid: Mapped[UUID] = bank_field("Base company currency", Uuid())
+    fingerprint: Mapped[str] = bank_field("Keyed bank account identity", String(64))
+    masked_label: Mapped[str] = bank_field("Masked bank account label", String(128))
+    intake_version: Mapped[int] = bank_field("Movement and source mapping fence", BigInteger())
+
+
+class BankSourceAccountMap(Owned, PlatformManagedMetaTable, Base):
+    __tablename__ = "erp_finance__bank_source_account_map"
+    __metatable_identifier__ = "erp_finance.bank_source_account_map"
+    __metatable_description__ = "Finance-approved mapping from an ERP-installed connector account to a canonical company bank account."
+    __table_args__ = (UniqueConstraint("environment_uid", "installation_uid", "source_account_uid"),)
+    environment_uid: Mapped[UUID] = bank_field("Verified ERP Environment", Uuid())
+    installation_uid: Mapped[UUID] = bank_field("ERP-assigned installation", Uuid())
+    source_account_uid: Mapped[UUID] = bank_field("Connector source account", Uuid())
+    bank_account_uid: Mapped[UUID] = bank_field("Canonical bank account", Uuid(), ForeignKey(BankAccount.uid), index=True)
+    version: Mapped[int] = bank_field("Reviewed mapping version", BigInteger())
+    actor_uid: Mapped[UUID] = bank_field("Authorizing person", Uuid())
+    created_at: Mapped[datetime] = bank_field("Mapping approval time", DateTime(timezone=True))
+
+
+class BankCounterpartyAlias(Owned, PlatformManagedMetaTable, Base):
+    __tablename__ = "erp_finance__bank_counterparty_alias"
+    __metatable_identifier__ = "erp_finance.bank_counterparty_alias"
+    __metatable_description__ = "An explicitly confirmed relationship between a counterparty account fingerprint and a Base party in one company."
+    __table_args__ = (UniqueConstraint("environment_uid", "company_uid", "fingerprint"),)
+    environment_uid: Mapped[UUID] = bank_field("Verified ERP Environment", Uuid())
+    company_uid: Mapped[UUID] = bank_field("Base operating company", Uuid())
+    fingerprint: Mapped[str] = bank_field("Keyed counterparty account fingerprint", String(64))
+    party_uid: Mapped[UUID] = bank_field("Confirmed Base party", Uuid())
+    actor_uid: Mapped[UUID] = bank_field("Approving person", Uuid())
+    created_at: Mapped[datetime] = bank_field("Alias approval time", DateTime(timezone=True))
+
+
+class BankMovement(Owned, PlatformManagedMetaTable, Base):
+    __tablename__ = "erp_finance__bank_movement"
+    __metatable_identifier__ = "erp_finance.bank_movement"
+    __metatable_description__ = "A reviewed booked bank movement with normalized evidence and an optional existing Finance payment."
+    __table_args__ = (UniqueConstraint("payment_uid"),)
+    bank_account_uid: Mapped[UUID] = bank_field("Canonical bank account", Uuid(), ForeignKey(BankAccount.uid), index=True)
+    booking_date: Mapped[date] = bank_field("Calendar date of the bank booking", Date())
+    signed_amount: Mapped[str] = bank_field("Exact signed bank amount", String(40))
+    currency_code: Mapped[str] = bank_field("ISO currency of the bank booking", String(3))
+    evidence: Mapped[dict] = bank_field("Accepted normalized banking evidence", JSON())
+    evidence_sha256: Mapped[str] = bank_field("Accepted evidence digest", String(64))
+    party_uid: Mapped[UUID | None] = bank_field("Explicitly selected Base party", Uuid())
+    payment_uid: Mapped[UUID | None] = bank_field("Finance payment link", Uuid(), ForeignKey(Payment.uid))
+    reverses_movement_uid: Mapped[UUID | None] = bank_field("Reviewed original bank movement", Uuid(), ForeignKey("erp_finance__bank_movement.uid"))
+    state: Mapped[str] = bank_field("Needs review, unmatched, reconciled or reversal review", String(24))
+    version: Mapped[int] = bank_field("Movement version", BigInteger())
+    actor_uid: Mapped[UUID] = bank_field("Accepting person", Uuid())
+    created_at: Mapped[datetime] = bank_field("Evidence acceptance time", DateTime(timezone=True))
+
+
+class BankMovementSource(Owned, PlatformManagedMetaTable, Base):
+    __tablename__ = "erp_finance__bank_movement_source"
+    __metatable_identifier__ = "erp_finance.bank_movement_source"
+    __metatable_description__ = "Source identity and provenance for a canonical movement. Several source observations may refer to one movement."
+    __table_args__ = (UniqueConstraint("environment_uid", "installation_uid", "source_account_uid", "statement_sha256", "row_locator"), UniqueConstraint("environment_uid", "installation_uid", "source_account_uid", "identity_kind", "identity_key", name="uq_finance_bank_movement_identity"),)
+    movement_uid: Mapped[UUID] = bank_field("Canonical movement", Uuid(), ForeignKey(BankMovement.uid), index=True)
+    environment_uid: Mapped[UUID] = bank_field("Verified ERP Environment", Uuid())
+    installation_uid: Mapped[UUID] = bank_field("ERP-assigned installation", Uuid())
+    source_account_uid: Mapped[UUID] = bank_field("Connector source account", Uuid())
+    adapter_key: Mapped[str] = bank_field("Source adapter provenance", String(64))
+    identity_kind: Mapped[str] = bank_field("Bank movement source identity kind", String(24))
+    identity_key: Mapped[str] = bank_field("Scoped bank movement identity key", String(100))
+    statement_uid: Mapped[UUID | None] = bank_field("Connector statement identity", Uuid())
+    statement_sha256: Mapped[str | None] = bank_field("Original statement bytes digest", String(64))
+    row_locator: Mapped[int | None] = bank_field("Original one-based booking ordinal", Integer())
+    evidence_sha256: Mapped[str] = bank_field("Normalized evidence digest", String(64))
+
+
+class BankReview(Owned, PlatformManagedMetaTable, Base):
+    __tablename__ = "erp_finance__bank_review"
+    __metatable_identifier__ = "erp_finance.bank_review"
+    __metatable_description__ = "Expiring, single-use reviewed banking evidence and the Finance state seen by its reviewer."
+    environment_uid: Mapped[UUID] = bank_field("Verified ERP Environment", Uuid(), index=True)
+    actor_uid: Mapped[UUID] = bank_field("Review owner", Uuid())
+    context: Mapped[dict] = bank_field("Evidence and workflow scope", JSON())
+    snapshot: Mapped[dict] = bank_field("Displayed Finance version fences", JSON())
+    expires_at: Mapped[datetime] = bank_field("Review expiry", DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = bank_field("Finalized review time", DateTime(timezone=True))
+
+
+class BankIntakeOperation(Owned, PlatformManagedMetaTable, Base):
+    __tablename__ = "erp_finance__bank_intake_operation"
+    __metatable_identifier__ = "erp_finance.bank_intake_operation"
+    __metatable_description__ = "An idempotent reviewed Finance banking command and its atomic accounting outcome."
+    __table_args__ = (UniqueConstraint("environment_uid", "actor_uid", "request_uid"),)
+    environment_uid: Mapped[UUID] = bank_field("Verified ERP Environment", Uuid())
+    actor_uid: Mapped[UUID] = bank_field("Verified commanding person", Uuid())
+    request_uid: Mapped[UUID] = bank_field("Caller request UID", Uuid())
+    request_sha256: Mapped[str] = bank_field("Canonical command digest", String(64))
+    result: Mapped[dict] = bank_field("Committed reconciliation result", JSON())
+    created_at: Mapped[datetime] = bank_field("Command completion time", DateTime(timezone=True))
+
+
+class BankGrantFence(Owned, PlatformManagedMetaTable, Base):
+    __tablename__ = "erp_finance__bank_grant_fence"
+    __metatable_identifier__ = "erp_finance.bank_grant_fence"
+    __metatable_description__ = "Credential-free source grant fence on the same governed DataSource as Finance accounting."
+    environment_uid: Mapped[UUID] = bank_field("Verified ERP Environment", Uuid(), index=True)
+    installation_uid: Mapped[UUID] = bank_field("ERP-assigned installation", Uuid())
+    binding_key: Mapped[str] = bank_field("Registered banking workflow key", String(128))
+    binding_generation: Mapped[int] = bank_field("Registered workflow generation", BigInteger())
+    connection_uid: Mapped[UUID] = bank_field("Connector file connection", Uuid())
+    source_account_uid: Mapped[UUID] = bank_field("Connector source account", Uuid())
+    actor_uid: Mapped[UUID] = bank_field("Grant owner", Uuid())
+    generation: Mapped[int] = bank_field("File connection generation", BigInteger())
+    state: Mapped[str] = bank_field("Open or closed grant", String(8))
+
+
+BANK_MODELS = (
+    BankAccount, BankSourceAccountMap, BankCounterpartyAlias, BankMovement,
+    BankMovementSource, BankReview, BankIntakeOperation, BankGrantFence,
+)
+
+
 RESOURCES = {"invoices": Invoice, "payments": Payment}
-MODELS = (Invoice, InvoiceLine, Payment, Allocation, Posting, AuditEvent)
+MODELS = (Invoice, InvoiceLine, Payment, Allocation, Posting, AuditEvent, *BANK_MODELS)
 
 
 def metatable_provider_models():

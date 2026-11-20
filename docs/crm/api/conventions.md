@@ -37,10 +37,16 @@ Teams for the effective person with `in_teams(..., max_age_seconds=0)` on every
 operation. Membership lookup failure never falls back to the workload's rights
 or a previously cached answer.
 
-Only the routes the deployment declares as public ingress, and the platform
-gateway admits as such, run without a caller: the Google OAuth callback and
-completion page. Credentials are stripped from those requests, and CRM code
-finds no caller there.
+CRM request identity applies to CRM business routes. GoogleConnector hosts
+the Google callback and verifies the provider response.
+
+In ERP, CRM requests also require CRM to be active in the verified Environment.
+This applies to reads, writes, `/mcp` and Google-backed CRM commands. Inactive
+CRM returns `403` with error code `module_disabled`. Missing or unavailable
+policy returns `503`. A policy change during a write can return `409` with
+`module_policy_changed`. Reload before retrying. Existing CRM operation
+capabilities still apply. The Base identity projection continues to maintain
+previously adopted identities while CRM business endpoints are inactive.
 
 ## Collections and discovery
 

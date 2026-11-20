@@ -8,7 +8,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from src.erp.module_access import Admission, admission
+from src.erp.module_access import admission, admission_for
 from src.erp.user_preferences.errors import UserPreferencesError
 from src.erp.user_preferences.scope import LOCAL_SCOPE_SETTING, MODULES_SETTING, SOURCE_SETTING
 
@@ -23,16 +23,18 @@ def _response(request, exc, *, module_key):
 
 
 class ModuleAdmissionMiddleware:
-    def __init__(self, app, *, module_key, policy_exempt=()):
+    def __init__(self, app, *, module_key, policy_exempt=(), policy_exempt_paths=()):
         self.app = app
         self.module_key = module_key
         self.policy_exempt = frozenset(policy_exempt)
+        self.policy_exempt_paths = frozenset(policy_exempt_paths)
 
     async def __call__(self, scope, receive, send):
         if (
             scope["type"] != "http"
             or scope["method"] == "OPTIONS"
             or scope["path"] == "/healthz"
+            or scope["path"] in self.policy_exempt_paths
             or (scope["method"], scope["path"]) in self.policy_exempt
         ):
             await self.app(scope, receive, send)
@@ -76,7 +78,6 @@ class ModuleAdmissionMiddleware:
             admission.reset(token)
 
     def admit(self, request, *, local):
-        from src.erp.modules import REQUIRED_MODULES
         from src.erp.user_preferences.admission import require_active
         from src.erp.user_preferences.scope import (
             configured_scope,
@@ -91,18 +92,20 @@ class ModuleAdmissionMiddleware:
             else scope_for_request(request, local=local)
         )
         policy = require_active(scope, (self.module_key,), local=local)
-        effective = (
-            frozenset(policy["active_module_keys"]) | REQUIRED_MODULES
-        ) & provisioned_module_keys()
-        current = Admission(scope, local, policy["version"], effective)
+        current = admission_for(
+            scope, local=local, policy=policy, provisioned=provisioned_module_keys()
+        )
         current.require(self.module_key)
         return current
 
 
-def install_module_admission(app, module_key: str, *, policy_exempt=()):
+def install_module_admission(app, module_key: str, *, policy_exempt=(), policy_exempt_paths=()):
     """Call immediately before installing the existing SDK identity middleware."""
     app.add_middleware(
-        ModuleAdmissionMiddleware, module_key=module_key, policy_exempt=policy_exempt
+        ModuleAdmissionMiddleware,
+        module_key=module_key,
+        policy_exempt=policy_exempt,
+        policy_exempt_paths=policy_exempt_paths,
     )
 
     async def access_error(request: Request, exc: UserPreferencesError):

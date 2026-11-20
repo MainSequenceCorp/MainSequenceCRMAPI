@@ -386,9 +386,9 @@ class Service:
                     {
                         "uid": uuid4(),
                         "resource": resource,
-                        "record_uid": UUID(row["uid"]),
-                        "operating_company_uid": UUID(row["operating_company_uid"]),
-                        "currency_uid": UUID(row["currency_uid"]),
+                        "record_uid": UUID(str(row["uid"])),
+                        "operating_company_uid": UUID(str(row["operating_company_uid"])),
+                        "currency_uid": UUID(str(row["currency_uid"])),
                         "phase": phase,
                         "account_role": role,
                         "amount": str(-amount if phase == "void" else amount),

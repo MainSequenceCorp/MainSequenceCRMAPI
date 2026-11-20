@@ -63,7 +63,7 @@ def _platform_agent(name: str) -> dict | None:
         return None
 
 
-async def resolve_assistant(local_tau_origin: str | None) -> dict:
+async def resolve_assistant(local_tau_origin: str | None, *, allow_platform: bool = True) -> dict:
     name = _card_name()
     unavailable = {
         "enabled": False,
@@ -91,4 +91,6 @@ async def resolve_assistant(local_tau_origin: str | None) -> dict:
                         }
         except (httpx.HTTPError, ValueError):
             pass
+    if not allow_platform:
+        return unavailable
     return await asyncio.to_thread(_platform_agent, name) or unavailable

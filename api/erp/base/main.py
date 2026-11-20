@@ -75,6 +75,12 @@ def discovery(resource):
     }
 
 
+def service_for(app: FastAPI, *, local: bool) -> Service:
+    actor, capabilities = actor_and_capabilities(local=local)
+    store = app.state.base_store
+    return Service(store, actor, capabilities, consumers=identity_consumers(store))
+
+
 def create_app(*, enabled=True, local=False, install_identity=True):
     modules = resolve_modules(["base"] if enabled else [])
     app = FastAPI(title="ERP Base API", version="0.1.0")
@@ -82,13 +88,7 @@ def create_app(*, enabled=True, local=False, install_identity=True):
     app.state.base_local = local
 
     def service():
-        actor, capabilities = actor_and_capabilities(local=local)
-        return Service(
-            app.state.base_store,
-            actor,
-            capabilities,
-            consumers=identity_consumers(app.state.base_store),
-        )
+        return service_for(app, local=local)
 
     @app.exception_handler(BaseError)
     async def domain_error(_request, error):

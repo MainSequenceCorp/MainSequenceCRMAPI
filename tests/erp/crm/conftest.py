@@ -56,7 +56,7 @@ def deployment_public_ingress(monkeypatch) -> tuple[tuple[str, str], ...]:
         (ROOT / ".mainsequence" / "workflows" / "crm-api.yaml").read_text(encoding="utf-8")
     )
     api = next(item for item in workflow["resources"] if item["key"] == "crm")
-    routes = api["spec"]["public_ingress"]
+    routes = api["spec"].get("public_ingress", [])
     monkeypatch.setenv("FASTAPI_PUBLIC_INGRESS", json.dumps(routes))
     return tuple((route["method"], route["path"]) for route in routes)
 
@@ -66,7 +66,7 @@ def config_file(tmp_path, monkeypatch):
     path = tmp_path / "crm.yaml"
     monkeypatch.setattr("src.erp.crm.config.CONFIG_PATH", path)
 
-    def write(*, solution_selling=True, google_workspace=True, campaigns=True):
+    def write(*, solution_selling=True, campaigns=True, google_workspace=True):
         path.write_text(
             "extensions:\n"
             f"  solution_selling:\n    active: {str(solution_selling).lower()}\n"

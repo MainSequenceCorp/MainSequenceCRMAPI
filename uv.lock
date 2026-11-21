@@ -828,7 +828,7 @@ mcp = [
 
 [[package]]
 name = "mainsequence-metatable"
-version = "0.1.67"
+version = "0.1.72"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -861,9 +861,9 @@ dependencies = [
     { name = "urllib3" },
     { name = "uvicorn" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/72/f5/10dfb1bc2c955f53b2bfe0ead82493e0ac2fdb5d65f6f96ca2b46cb080a2/mainsequence_metatable-0.1.67.tar.gz", hash = "sha256:86a802d5fa1446737ed2083210217bdb89cac2c57d4ff16b0dd4dadd83ef2930", size = 1390500, upload-time = "2026-11-17T08:03:14.448Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/93/7c/a54ace5915da593568b804b5435b63c0b05051cce82e3447771e98b663d5/mainsequence_metatable-0.1.72.tar.gz", hash = "sha256:5b4f70a5f37ed04cd590daa2539e707decc1c8fea50cfba26065191f505e05a4", size = 1428561, upload-time = "2026-11-21T09:01:58.52Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cf/1a/cfbca3a52f17c3803475260f4e5819a7d76385dc31c9f537a449c01dba6e/mainsequence_metatable-0.1.67-py3-none-any.whl", hash = "sha256:e59f33eef7dbb9675d0f078a5212794ed2a6260bb143186764b05efdc86e8867", size = 2653197, upload-time = "2026-11-17T08:03:12.242Z" },
+    { url = "https://files.pythonhosted.org/packages/78/30/1064122b9115be7d60c218bc64faebf1428ea8fe742474565903b5b38e57/mainsequence_metatable-0.1.72-py3-none-any.whl", hash = "sha256:26a7ff0cb9fd20790d4eda9173bf1d13a852d48419fcbb7a8061aa3eb9eeba62", size = 2730458, upload-time = "2026-11-21T09:01:56.407Z" },
 ]
 
 [[package]]
@@ -902,7 +902,7 @@ requires-dist = [
     { name = "httpx2", specifier = ">=2.13,<3" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "mainsequence", extras = ["mcp"], specifier = ">=9.0.31,<10" },
-    { name = "mainsequence-metatable", specifier = ">=0.1.67,<0.2" },
+    { name = "mainsequence-metatable", specifier = ">=0.1.72,<0.2" },
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "ms-tau-sdk", git = "https://github.com/mainsequence-sdk/ms-tau-sdk.git?rev=v3.0.2" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.13,<3" },

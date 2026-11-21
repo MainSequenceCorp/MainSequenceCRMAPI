@@ -150,7 +150,7 @@ mainsequence==9.0.40
     # via
     #   mainsequence-metatable
     #   mainsequencecrmapi
-mainsequence-metatable==0.1.67
+mainsequence-metatable==0.1.72
     # via mainsequencecrmapi
 mako==1.4.1
     # via alembic
